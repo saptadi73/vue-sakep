@@ -1,0 +1,47 @@
+{
+	"info": {
+		"_postman_id": "12b9508c-aa73-47e8-ae32-183094b967a5",
+		"name": "KanBPRS",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"item": [
+		{
+			"name": "http://iba-net.02.mglobalperdana.com:33503/kirim/dashkan/get",
+			"request": {
+				"method": "POST",
+				"header": [
+					{
+						"key": "Device-Terminal",
+						"value": "Denmas"
+					},
+					{
+						"key": "Content-Type",
+						"value": "application/json"
+					}
+				],
+				"body": {
+					"mode": "raw",
+					"raw": "{\n\t\"request\": \"GetNeracaHarian\",\n\t\"userid\": \"System\",\n\t\"signature\": \"0842737f429ca9f1694a73ace4d49e5e\",\n\t\"inptgljam\": \"20250611171023\",\n\t\"data01\": {\n\t\t\"unit\": \"00\",\n\t\t\"tgl\": \"20250301\"\n\t}\n}"
+				},
+				"url": {
+					"raw": "http://iba-net.02.mglobalperdana.com:33503/kirim/dashkan/get",
+					"protocol": "http",
+					"host": [
+						"iba-net",
+						"02",
+						"mglobalperdana",
+						"com"
+					],
+					"port": "33503",
+					"path": [
+						"kirim",
+						"dashkan",
+						"get"
+					]
+				},
+				"description": "TestKan"
+			},
+			"response": []
+		}
+	]
+}

@@ -1,0 +1,448 @@
+
+https://api.jabmart.id/kan/dokumen/
+
+Authorization
+## User Dan Password
+User : kanjabung
+PassWord : W4oAB4jH3pPoTb6J
+
+##Endcode
+Base64String(GetBytes("user:password"))
+
+## Masukan Sebagai Parameter
+Authorization : "Basic " & Base64String(GetBytes("user:password"))
+
+## Wajib Untuk Setiap Request
+
+Json Formatter
+{
+  "info": {
+    "_postman_id": "48a2f55f-bb56-4645-87a3-1ba3bbcfc465",
+    "name": "KanJabung",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "12175645"
+  },
+  "item": [
+    {
+      "name": "Checklogin",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Basic a2FuamFidW5nOlc0b0FCNGpIM3BQb1RiNko=",
+            "description": "Wajib Untuk Setiap Pemanggilan API",
+            "type": "text"
+          },
+          {
+            "key": "ContentType",
+            "value": "text/xml; charset=utf-8",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "https://api.jabmart.id/kan/goerpapi.asmx/checklogin",
+          "protocol": "https",
+          "host": [
+            "api",
+            "jabmart",
+            "id"
+          ],
+          "path": [
+            "kan",
+            "goerpapi.asmx",
+            "checklogin"
+          ]
+        },
+        "description": "Checks login status for the KanJabung API.\n\n**Purpose**  \nVerifies whether the provided credentials are valid and the client can successfully access the API.\n\n**Authorization**  \nUses Basic Authentication via the `Authorization` header.\n\n**Headers**\n\n- `Authorization`: Basic credentials required to access the endpoint\n    \n- `ContentType`: `text/xml; charset=utf-8`\n    \n\n**Request**\n\n- Method: `GET`\n    \n- No request body\n    \n\n**Expected Response**  \nReturns HTTP `200 OK` with a JSON response containing a `header` object and `data` array. A successful login check is indicated by:\n\n- `header.ApiType`: `checklogin`\n    \n- `header.ResponseCode`: `00`\n    \n- `header.ResponseText`: `Sukses`\n    \n\n**Note**  \nThis endpoint checks login status."
+      },
+      "response": []
+    },
+    {
+      "name": "lokasi",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Basic a2FuamFidW5nOlc0b0FCNGpIM3BQb1RiNko=",
+            "type": "text"
+          },
+          {
+            "key": "ContentType",
+            "value": "text/xml; charset=utf-8",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "https://api.jabmart.id/kan/goerpapi.asmx/lokasi",
+          "protocol": "https",
+          "host": [
+            "api",
+            "jabmart",
+            "id"
+          ],
+          "path": [
+            "kan",
+            "goerpapi.asmx",
+            "lokasi"
+          ]
+        },
+        "description": "Retrieves the list of lokasi (locations/stores) from Goerp++.\n\n**Method & endpoint**\n\n- `GET` `https://api.jabmart.id/kan/goerpapi.asmx/lokasi`\n    \n\n**Headers / auth requirements**\n\n- `Authorization`: Basic authentication header is required.\n    \n- `ContentType`: `text/xml; charset=utf-8`\n    \n\n**Successful response**\n\n- HTTP `200 OK`\n    \n- Response body contains:\n    \n    - `header`: Response metadata from the service.\n        \n    - `data`: Array of lokasi records.\n        \n\n**Response field notes**\n\n- `header.ApiType`: API type/category returned by the service. Example: `lokasi`.\n    \n- `header.Status`: Additional status detail from the service.\n    \n- `header.ResponseCode`: Service response code. Example: `00` indicates success.\n    \n- `header.ResponseText`: Human-readable response message. Example: `Sukses`.\n    \n- `header.headerdata`: Additional header metadata as a serialized object/string.\n    \n- `data[].store_no`: Unique store/location number.\n    \n- `data[].name`: Store or location name.\n    \n- `data[].Groupname`: Group/category of the location, such as Office, Gudang, or JabMart.\n    \n- `data[].PlanoFlag`: Plano or flag indicator associated with the location.\n    \n\n**Example success shape**\n\n``` json\n{\n  \"header\": {\n    \"ApiType\": \"lokasi\",\n    \"Status\": \"\",\n    \"ResponseCode\": \"00\",\n    \"ResponseText\": \"Sukses\",\n    \"headerdata\": \"{}\"\n  },\n  \"data\": [\n    {\n      \"store_no\": 600000,\n      \"name\": \"Head Office\",\n      \"Groupname\": \"Office\",\n      \"PlanoFlag\": \"Flag 1\"\n    }\n  ]\n}\n\n ```"
+      },
+      "response": []
+    },
+    {
+      "name": "listaccount",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Basic a2FuamFidW5nOlc0b0FCNGpIM3BQb1RiNko=",
+            "type": "text"
+          },
+          {
+            "key": "ContentType",
+            "value": "text/xml; charset=utf-8",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "https://api.jabmart.id/kan/goerpapi.asmx/listaccount",
+          "protocol": "https",
+          "host": [
+            "api",
+            "jabmart",
+            "id"
+          ],
+          "path": [
+            "kan",
+            "goerpapi.asmx",
+            "listaccount"
+          ]
+        },
+        "description": "Retrieves the account/chart-of-accounts list from the KanJabung ERP API.\n\n**Method & endpoint**\n\n- `GET` `https://api.jabmart.id/kan/goerpapi.asmx/listaccount`\n    \n\n**Headers / auth requirements**\n\n- `Authorization`: Basic authentication header is required.\n    \n- `ContentType`: `text/xml; charset=utf-8`\n    \n\n**Successful response**\n\n- HTTP `200 OK`\n    \n- Response body contains:\n    \n    - `header`: Metadata about the API response.\n        \n    - `data`: Array of account records.\n        \n\n**Response field notes**\n\n- `header.ApiType`: API category/type returned by the service.\n    \n- `header.Status`: Status detail from the service.\n    \n- `header.ResponseCode`: Service response code. Example: `00` indicates success.\n    \n- `header.ResponseText`: Human-readable response message. Example: `Sukses`.\n    \n- `header.headerdata`: Additional header metadata as a serialized object/string.\n    \n- `data[].group1`: Top-level account grouping, such as `Asset`.\n    \n- `data[].group2`: Secondary account grouping, such as `Current Asset`.\n    \n- `data[].key_coa`: Account code / chart-of-accounts key.\n    \n- `data[].coa_name`: Account name / description.\n    \n\n**Example success shape**\n\n``` json\n{\n  \"header\": {\n    \"ApiType\": \"lokasi\",\n    \"Status\": \"\",\n    \"ResponseCode\": \"00\",\n    \"ResponseText\": \"Sukses\",\n    \"headerdata\": \"{}\"\n  },\n  \"data\": [\n    {\n      \"group1\": \"Asset\",\n      \"group2\": \"Current Asset\",\n      \"key_coa\": \"1\",\n      \"coa_name\": \"Asset\"\n    }\n  ]\n}\n\n ```"
+      },
+      "response": []
+    },
+    {
+      "name": "trialbalance",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Basic a2FuamFidW5nOlc0b0FCNGpIM3BQb1RiNko=",
+            "type": "text"
+          },
+          {
+            "key": "ContentType",
+            "value": "text/xml; charset=utf-8",
+            "type": "text"
+          },
+          {
+            "key": "ReqMonth",
+            "value": "March",
+            "type": "text"
+          },
+          {
+            "key": "ReqYear",
+            "value": "2026",
+            "type": "text"
+          },
+          {
+            "key": "Jenis",
+            "value": "Lokasi",
+            "type": "text"
+          },
+          {
+            "key": "Lokasi",
+            "value": "620001,620002",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "https://api.jabmart.id/kan/goerpapi.asmx/neraca",
+          "protocol": "https",
+          "host": [
+            "api",
+            "jabmart",
+            "id"
+          ],
+          "path": [
+            "kan",
+            "goerpapi.asmx",
+            "neraca"
+          ]
+        },
+        "description": "Retrieves the trial balance / balance sheet (neraca) data for the requested accounting period and scope.\n\nRequired headers\n\n- Authorization: Basic authentication credential used to authorize access to the endpoint.\n    \n- ContentType: Must be `text/xml; charset=utf-8` for this API.\n    \n- ReqMonth: Reporting month to retrieve, for example `March`.\n    \n- ReqYear: Reporting year to retrieve, for example `2026`.\n    \n- Jenis: Scope type for the report, for example `Lokasi`.\n    \n- Lokasi: One or more location codes to include, separated by commas, for example `620001,620002`.\n    \n\nSuccessful response shape\n\n- `header`: Metadata about the API response.\n    \n    - `ApiType`: API identifier, expected to be `neraca`.\n        \n    - `ResponseCode`: Status code from the API, where `00` indicates success.\n        \n    - `ResponseText`: Status text, for example `Sukses`.\n        \n    - `Status` and `headerdata`: Additional metadata fields.\n        \n- `data`: Array of balance sheet rows.\n    \n    - `Account`: Account code.\n        \n    - `Description`: Account or group label.\n        \n    - `Amount`: Main balance value as a formatted string, which can be null for grouping rows.\n        \n    - `Amount1`: Secondary amount field, currently null in the successful example.\n        \n    - `PadLeft`: Indentation level for hierarchy display.\n        \n\nExample interpretation  \nA row such as `{\"Account\":\"1102\",\"Description\":\"Kas Di Bank\",\"Amount\":\"45,896,969.00\",\"PadLeft\":3}` means the `Kas Di Bank` account has a reported balance of 45,896,969.00 for the requested month, year, and selected locations. Rows with null amounts, such as `Asset` or `Aset Lancar`, act as section headers in the hierarchical report."
+      },
+      "response": []
+    },
+    {
+      "name": "ledger",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Basic a2FuamFidW5nOlc0b0FCNGpIM3BQb1RiNko=",
+            "type": "text"
+          },
+          {
+            "key": "ContentType",
+            "value": "text/xml; charset=utf-8",
+            "type": "text"
+          },
+          {
+            "key": "Jenis",
+            "value": "Consolidated",
+            "type": "text"
+          },
+          {
+            "key": "Lokasi",
+            "value": "620001,620002",
+            "type": "text"
+          },
+          {
+            "key": "Account",
+            "value": "110100",
+            "type": "text"
+          },
+          {
+            "key": "StartDate",
+            "value": "2026-04-01",
+            "type": "text"
+          },
+          {
+            "key": "EndDate",
+            "value": "2026-04-05",
+            "type": "text"
+          },
+          {
+            "key": "Page",
+            "value": "1",
+            "type": "text"
+          },
+          {
+            "key": "MaxRecord",
+            "value": "1000",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "https://api.jabmart.id/kan/goerpapi.asmx/ledger",
+          "protocol": "https",
+          "host": [
+            "api",
+            "jabmart",
+            "id"
+          ],
+          "path": [
+            "kan",
+            "goerpapi.asmx",
+            "ledger"
+          ]
+        },
+        "description": "Retrieves ledger report data for a given account, location set, and date range.\n\nHeaders\n\n- Authorization: Basic authentication credential required to access the endpoint.\n    \n- ContentType: Request content type header used by this API (`text/xml; charset=utf-8`).\n    \n- Jenis: Report type, for example `Consolidated`.\n    \n- Lokasi: One or more location codes, comma-separated.\n    \n- Account: Account code to query, for example `110100`.\n    \n- StartDate: Start of the reporting period in `YYYY-MM-DD` format.\n    \n- EndDate: End of the reporting period in `YYYY-MM-DD` format.\n    \n- Page: Page number to retrieve.\n    \n- MaxRecord: Maximum number of records per page.\n    \n\nBehavior\n\n- Returns ledger rows for the requested account and period.\n    \n- Pagination details are returned in `header.Page`, `header.PageCount`, and `header.MaxRecordPerPage`.\n    \n- Additional report metadata is returned in `header.headerdata`, such as report name, period, and account range.\n    \n\nResponse\n\n- `header`: Request status and pagination metadata. A successful response typically includes `ResponseCode` = `00` and `ResponseText` = `Sukses`.\n    \n- `data`: Array of ledger rows. Common fields include:\n    \n    - `Periode`: Accounting period.\n        \n    - `Location`: Location name.\n        \n    - `Account`: Account identifier.\n        \n    - `Description`: Account description.\n        \n    - `jDate`: Transaction date.\n        \n    - `Note`: Transaction label or source.\n        \n    - `Remarks`: Free-text remarks.\n        \n    - `Beginning`: Beginning balance amount.\n        \n    - `Debit`: Debit amount.\n        \n    - `Credit`: Credit amount.\n        \n    - `Variant`: Net movement value.\n        \n    - `Balance`: Calculated balance field when present.\n        \n    - `fCalc`: Server-side calculation metadata.\n        \n\nExample use case  \nUse this request to fetch a ledger snapshot for one account across one or more locations within a selected date range for reconciliation or reporting."
+      },
+      "response": []
+    },
+    {
+      "name": "jurnal",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Basic a2FuamFidW5nOlc0b0FCNGpIM3BQb1RiNko=",
+            "type": "text"
+          },
+          {
+            "key": "ContentType",
+            "value": "text/xml; charset=utf-8",
+            "type": "text"
+          },
+          {
+            "key": "Jenis",
+            "value": "Consolidated",
+            "type": "text"
+          },
+          {
+            "key": "Lokasi",
+            "value": "620001,620002",
+            "type": "text"
+          },
+          {
+            "key": "StartDate",
+            "value": "2026-04-01",
+            "type": "text"
+          },
+          {
+            "key": "EndDate",
+            "value": "2026-04-05",
+            "type": "text"
+          },
+          {
+            "key": "Page",
+            "value": "2",
+            "type": "text"
+          },
+          {
+            "key": "MaxRecord",
+            "value": "1000",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "https://api.jabmart.id/kan/goerpapi.asmx/jurnal",
+          "protocol": "https",
+          "host": [
+            "api",
+            "jabmart",
+            "id"
+          ],
+          "path": [
+            "kan",
+            "goerpapi.asmx",
+            "jurnal"
+          ]
+        },
+        "description": "Retrieves journal entry data from the KanJabung API for a specified date range, one or more locations, and a requested page of results.\n\nRequired headers\n\n- Authorization: Basic authentication credentials required to access the endpoint.\n    \n- ContentType: Should be set to `text/xml; charset=utf-8` for this request.\n    \n- Jenis: Determines the journal data variant to return, for example `Consolidated`.\n    \n- Lokasi: Comma-separated location codes to filter the journal entries, for example `620001,620002`.\n    \n- StartDate: Start of the reporting period in `YYYY-MM-DD` format.\n    \n- EndDate: End of the reporting period in `YYYY-MM-DD` format.\n    \n- Page: The page number to fetch.\n    \n- MaxRecord: Maximum number of records to include in a single page.\n    \n\nPagination behavior  \nThis endpoint returns paginated data. The request header `Page` selects which result page is returned, while `MaxRecord` controls the page size. In the response, pagination details are returned in `header.Page`, `header.PageCount`, and `header.MaxRecordPerPage`. For example, if `Page` is `2` and `PageCount` is `34`, the current response contains the second page out of thirty-four total pages.\n\nResponse structure  \nThe response body contains two main sections:\n\n- `header`: Metadata about the request result, including the API type, success or error information, current page, total page count, maximum records per page, and summary header rows in `headerdata`.\n    \n- `data`: An array of journal entry records. Each record can include fields such as `Periode`, `ProjectName`, `Location`, `jNumber`, `jDate`, `jtype`, `Supplier/Customer`, `Remarks`, `Account`, `Description`, `Notes`, `Line_no`, `Debit`, `Credit`, `Division`, `CASHFLOW`, and `Update_By`.\n    \n\nShort example interpretation  \nA successful response with `ResponseCode` = `00` and `ResponseText` = `Sukses` means the request was processed correctly. In the sample data, the entry with journal number `AR-SLS.199342260401090439128` was recorded on `2026-04-01T09:15:52` for location `620001`, posted to account `111401` (`Persediaan Dalam Perjalanan`), with a debit amount of `20250` and credit amount of `0`."
+      },
+      "response": []
+    },
+    {
+      "name": "neraca",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Basic a2FuamFidW5nOlc0b0FCNGpIM3BQb1RiNko=",
+            "type": "text"
+          },
+          {
+            "key": "ContentType",
+            "value": "text/xml; charset=utf-8",
+            "type": "text"
+          },
+          {
+            "key": "ReqMonth",
+            "value": "March",
+            "type": "text"
+          },
+          {
+            "key": "ReqYear",
+            "value": "2026",
+            "type": "text"
+          },
+          {
+            "key": "Jenis",
+            "value": "Lokasi",
+            "type": "text"
+          },
+          {
+            "key": "Lokasi",
+            "value": "620001,620002",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "https://api.jabmart.id/kan/goerpapi.asmx/neraca",
+          "protocol": "https",
+          "host": [
+            "api",
+            "jabmart",
+            "id"
+          ],
+          "path": [
+            "kan",
+            "goerpapi.asmx",
+            "neraca"
+          ]
+        },
+        "description": "Retrieves neraca (balance sheet) data from the KanJabung API for a specific reporting month, year, type, and one or more locations.\n\nPurpose\n\n- Use this request to fetch balance sheet account lines and amounts for the requested accounting period.\n    \n- The response includes a header object with API execution metadata and a data array containing account rows.\n    \n\nMethod and Endpoint\n\n- Method: GET\n    \n- Endpoint: [https://api.jabmart.id/kan/goerpapi.asmx/neraca](https://api.jabmart.id/kan/goerpapi.asmx/neraca)\n    \n\nRequired Headers\n\n- Authorization: Basic authentication value required by the API.\n    \n- ContentType: text/xml; charset=utf-8\n    \n- ReqMonth: Reporting month to query, for example March.\n    \n- ReqYear: Reporting year to query, for example 2026.\n    \n- Jenis: Data grouping/type, for example Lokasi.\n    \n- Lokasi: Comma-separated location codes, for example 620001,620002.\n    \n\nExample Successful Response Shape\n\n- HTTP 200 indicates the request completed successfully.\n    \n- The body contains:\n    \n    - header\n        \n        - ApiType: API identifier, example: neraca\n            \n        - Status: status field returned by the service\n            \n        - ResponseCode: service-level result code, example: 00\n            \n        - ResponseText: service-level result message, example: Sukses\n            \n        - headerdata: additional header metadata array\n            \n    - data: array of balance sheet rows, where each row may include:\n        \n        - Account: account code\n            \n        - Description: account name/label\n            \n        - Amount: primary amount as a formatted string, may be null\n            \n        - Amount1: secondary amount field, may be null\n            \n        - PadLeft: indentation level for hierarchical presentation\n            \n\nExample row fields observed in the response\n\n- Account: 1101\n    \n- Description: Kas Di Tangan\n    \n- Amount: 13,648,521.00\n    \n- Amount1: null\n    \n- PadLeft: 3\n    \n\nUsage Notes\n\n- This request relies on header values to define the reporting period and scope.\n    \n- Lokasi accepts multiple location identifiers separated by commas.\n    \n- Amount values are returned as formatted strings, so convert them before numeric calculations if needed.\n    \n- Some rows are summary/group headings and may return null for Amount or Amount1.\n    \n- A successful service response is indicated by ResponseCode 00 and ResponseText Sukses in the response header body."
+      },
+      "response": []
+    },
+    {
+      "name": "labarugi",
+      "request": {
+        "auth": {
+          "type": "noauth"
+        },
+        "method": "GET",
+        "header": [
+          {
+            "key": "Authorization",
+            "value": "Basic a2FuamFidW5nOlc0b0FCNGpIM3BQb1RiNko=",
+            "type": "text"
+          },
+          {
+            "key": "ContentType",
+            "value": "text/xml; charset=utf-8",
+            "type": "text"
+          },
+          {
+            "key": "ReqMonth",
+            "value": "March",
+            "type": "text"
+          },
+          {
+            "key": "ReqYear",
+            "value": "2026",
+            "type": "text"
+          },
+          {
+            "key": "Jenis",
+            "value": "Lokasi",
+            "type": "text"
+          },
+          {
+            "key": "Lokasi",
+            "value": "620001,620002",
+            "type": "text"
+          }
+        ],
+        "url": {
+          "raw": "https://api.jabmart.id/kan/goerpapi.asmx/labarugi",
+          "protocol": "https",
+          "host": [
+            "api",
+            "jabmart",
+            "id"
+          ],
+          "path": [
+            "kan",
+            "goerpapi.asmx",
+            "labarugi"
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}
