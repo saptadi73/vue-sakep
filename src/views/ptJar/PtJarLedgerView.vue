@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import JurnalTable from '@/components/JurnalTable.vue'
 import LedgerTable from '@/components/LedgerTable.vue'
@@ -41,6 +41,7 @@ const selectedLokasi = String(route.query.lokasi ?? '')
 const fromPage = String(route.query.from ?? 'balance-sheet')
 
 const ledgerRows = ref<JarLedgerRow[]>([])
+const selectedLedgerLocation = ref('ALL')
 const ledgerLoading = ref(false)
 const ledgerPage = ref(1)
 const ledgerPageCount = ref(1)
@@ -53,6 +54,26 @@ const jurnalPage = ref(1)
 const jurnalPageCount = ref(1)
 const jurnalMaxRecord = ref(1000)
 const jurnalSearch = ref('')
+
+const ledgerLocationOptions = computed(() => {
+  const uniqueLocations = new Set(
+    ledgerRows.value
+      .map((row) => String(row.Location ?? '').trim())
+      .filter((location) => location.length > 0),
+  )
+
+  return ['ALL', ...Array.from(uniqueLocations).sort()]
+})
+
+const filteredLedgerRows = computed(() => {
+  if (selectedLedgerLocation.value === 'ALL') {
+    return ledgerRows.value
+  }
+
+  return ledgerRows.value.filter(
+    (row) => String(row.Location ?? '').trim() === selectedLedgerLocation.value,
+  )
+})
 
 const filteredJurnalRows = computed(() => {
   const query = jurnalSearch.value.trim().toLowerCase()
@@ -95,6 +116,7 @@ const loadLedger = async (page = 1) => {
   selectedLedgerEntry.value = null
   jurnalRows.value = []
   jurnalSearch.value = ''
+  selectedLedgerLocation.value = 'ALL'
 
   const range = getDateRange(selectedMonth, selectedYear)
   const params: JarLedgerRequestParams = {
@@ -154,8 +176,8 @@ const goToJurnalPage = async (nextPage: number) => {
 }
 
 const exportLedgerExcel = () => {
-  if (!ledgerRows.value.length) return
-  const data = ledgerRows.value.map((row) => ({
+  if (!filteredLedgerRows.value.length) return
+  const data = filteredLedgerRows.value.map((row) => ({
     Date: row.jDate ?? '-',
     Location: row.Location ?? '-',
     Account: row.Account ?? '-',
@@ -194,6 +216,33 @@ const goBack = () => {
 }
 
 onMounted(() => loadLedger())
+
+watch(selectedLedgerLocation, (nextLocation) => {
+  if (nextLocation === 'ALL') {
+    return
+  }
+
+  const existsInCurrentRows = ledgerRows.value.some(
+    (row) => String(row.Location ?? '').trim() === nextLocation,
+  )
+
+  if (!existsInCurrentRows) {
+    selectedLedgerLocation.value = 'ALL'
+    selectedLedgerEntry.value = null
+    jurnalRows.value = []
+    jurnalSearch.value = ''
+    return
+  }
+
+  if (
+    selectedLedgerEntry.value &&
+    String(selectedLedgerEntry.value.Location ?? '').trim() !== nextLocation
+  ) {
+    selectedLedgerEntry.value = null
+    jurnalRows.value = []
+    jurnalSearch.value = ''
+  }
+})
 </script>
 
 <template>
@@ -209,10 +258,18 @@ onMounted(() => loadLedger())
     </header>
 
     <div class="ledger-toolbar">
+      <label class="location-filter">
+        Filter Lokasi
+        <select v-model="selectedLedgerLocation">
+          <option v-for="location in ledgerLocationOptions" :key="location" :value="location">
+            {{ location === 'ALL' ? 'Semua Lokasi' : location }}
+          </option>
+        </select>
+      </label>
       <button
         type="button"
         class="export-btn"
-        :disabled="!ledgerRows.length"
+        :disabled="!filteredLedgerRows.length"
         @click="exportLedgerExcel"
       >
         Export Ledger (Excel)
@@ -229,7 +286,7 @@ onMounted(() => loadLedger())
         </button>
       </div>
 
-      <LedgerTable :rows="ledgerRows" :enable-drilldown="true" @row-click="loadJurnal" />
+      <LedgerTable :rows="filteredLedgerRows" :enable-drilldown="true" @row-click="loadJurnal" />
 
       <section v-if="selectedLedgerEntry" class="jurnal-panel">
         <div class="jurnal-header">
@@ -320,6 +377,23 @@ onMounted(() => loadLedger())
 .ledger-toolbar {
   display: flex;
   gap: 0.6rem;
+  flex-wrap: wrap;
+  align-items: end;
+}
+
+.location-filter {
+  display: grid;
+  gap: 0.25rem;
+  font-size: 0.8rem;
+  color: #1a3354;
+}
+
+.location-filter select {
+  min-height: 34px;
+  border-radius: 8px;
+  border: 1px solid #bfd2ec;
+  padding: 0.35rem 0.55rem;
+  font: inherit;
 }
 
 .export-btn {

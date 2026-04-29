@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import ReportTable from '@/components/ReportTable.vue'
 import { fetchJarBalanceSheet } from '@/services/jabMartService'
@@ -22,6 +22,12 @@ const monthOptions = [
   'December',
 ]
 
+const lokasiOptions = [
+  { value: '620001,620002', label: 'Semua Lokasi' },
+  { value: '620001', label: '620001' },
+  { value: '620002', label: '620002' },
+]
+
 const selectedMonth = ref(new Intl.DateTimeFormat('en-US', { month: 'long' }).format(new Date()))
 const selectedYear = ref(String(new Date().getFullYear()))
 const selectedJenis = ref('Lokasi')
@@ -38,6 +44,12 @@ const headerNote = computed(() => {
     return 'Data terambil langsung dari API Jab Mart.'
   }
   return `Data contoh ditampilkan karena koneksi API gagal atau kredensial belum diset. ${sourceNote.value}`
+})
+
+const lokasiFilterLabel = computed(() => {
+  return (
+    lokasiOptions.find((item) => item.value === selectedLokasi.value)?.label ?? selectedLokasi.value
+  )
 })
 
 const loadReport = async () => {
@@ -79,6 +91,10 @@ const navigateToLedger = (row: ReportRow) => {
 }
 
 onMounted(loadReport)
+
+watch(selectedLokasi, () => {
+  loadReport()
+})
 </script>
 
 <template>
@@ -87,6 +103,7 @@ onMounted(loadReport)
       <p class="pill">PT. JAR (JAB Mart)</p>
       <h1>Balance Sheet</h1>
       <p class="sub">Draft konsolidasi menuju format SAK EP.</p>
+      <p class="filter-note">Filter lokasi: {{ lokasiFilterLabel }}</p>
       <p class="status-note">{{ headerNote }}</p>
     </header>
 
@@ -112,8 +129,12 @@ onMounted(loadReport)
       </label>
 
       <label>
-        Lokasi
-        <input v-model="selectedLokasi" placeholder="620001,620002" />
+        Filter Lokasi
+        <select v-model="selectedLokasi">
+          <option v-for="lokasi in lokasiOptions" :key="lokasi.value" :value="lokasi.value">
+            {{ lokasi.label }}
+          </option>
+        </select>
       </label>
 
       <button type="submit" :disabled="loading">
@@ -156,6 +177,12 @@ onMounted(loadReport)
 .sub {
   color: #415575;
   margin: 0;
+}
+
+.filter-note {
+  margin: 0.2rem 0 0;
+  font-size: 0.84rem;
+  color: #1f487e;
 }
 
 .status-note {

@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { RouterLink, RouterView, useRoute } from 'vue-router'
+import iconLaporan from '@/asset/icon/icon_laporan.png'
 
 const route = useRoute()
 
@@ -44,10 +45,13 @@ const isActive = (path: string) => route.path === path
 <template>
   <div class="app-shell">
     <aside class="side-panel">
-      <div>
-        <p class="brand-kicker">SAK EP Consolidation</p>
-        <h1>Portal Pelaporan Keuangan</h1>
-        <p class="desc">Multi-sumber laporan anak perusahaan untuk standardisasi grup.</p>
+      <div class="brand-panel">
+        <img :src="iconLaporan" alt="Icon laporan" class="brand-icon" />
+        <div>
+          <p class="brand-kicker">SAK EP Consolidation</p>
+          <h1>Portal Pelaporan Keuangan</h1>
+          <p class="desc">Multi-sumber laporan anak perusahaan untuk standardisasi grup.</p>
+        </div>
       </div>
 
       <nav class="company-nav">
@@ -90,6 +94,23 @@ const isActive = (path: string) => route.path === path
   align-content: start;
   gap: 1.2rem;
   box-shadow: 0 22px 50px rgba(9, 28, 57, 0.26);
+}
+
+.brand-panel {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.85rem;
+  align-items: start;
+}
+
+.brand-icon {
+  width: 52px;
+  height: 52px;
+  object-fit: contain;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.14);
+  padding: 0.45rem;
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.12);
 }
 
 .brand-kicker {
