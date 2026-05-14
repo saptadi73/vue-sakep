@@ -8,7 +8,9 @@ import tailwindcss from '@tailwindcss/vite'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [vue(), vueDevTools(), tailwindcss()],
+  // Development server with proxy (only for dev mode)
   server: {
+    port: 4000,
     proxy: {
       '/api/bprs': {
         target: 'http://iba-net.02.mglobalperdana.com:33503',

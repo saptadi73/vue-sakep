@@ -1,0 +1,173 @@
+{
+  "entities": [
+    {
+      "id": "pt-jar",
+      "name": "PT. JAB Mart",
+      "type": "JAB MART",
+      "apiBaseUrl": "/api/jabmart",
+      "description": "JAB Mart API untuk laporan keuangan"
+    },
+    {
+      "id": "pt-bprs",
+      "name": "PT. BPRS",
+      "type": "BPRS",
+      "apiBaseUrl": "/api/bprs",
+      "endpoint": "/kirim/dashkan/get",
+      "description": "BPRS API untuk laporan keuangan",
+      "authentication": {
+        "type": "custom",
+        "headers": {
+          "Device-Terminal": "VITE_BPRS_DEVICE",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "request": "request_type",
+          "userid": "VITE_BPRS_USER",
+          "signature": "VITE_BPRS_SIGNATURE",
+          "inptgljam": "YYYYMMDDHHMMSS"
+        }
+      },
+      "reports": [
+        {
+          "id": "balance-sheet",
+          "name": "Neraca Harian",
+          "requestType": "GetNeracaHarian",
+          "route": "/reports/pt-bprs/balance-sheet",
+          "component": "PtBprsBalanceSheetView"
+        },
+        {
+          "id": "pnl",
+          "name": "Laba Rugi Harian",
+          "requestType": "GetLabaRugiHarian",
+          "route": "/reports/pt-bprs/pnl",
+          "component": "PtBprsPnlView"
+        },
+        {
+          "id": "gl",
+          "name": "General Ledger",
+          "requestType": "GetHistACC",
+          "route": "/reports/pt-bprs/gl",
+          "component": "PtBprsGlView",
+          "drilldown": true
+        },
+        {
+          "id": "trial-balance",
+          "name": "Neraca Percobaan",
+          "requestType": "GetNeracaPercobaan",
+          "route": "/reports/pt-bprs/trial-balance",
+          "component": "PtBprsTrialBalanceView"
+        }
+      ]
+    },
+    {
+      "id": "pt-kanjabung",
+      "name": "USPPS PT. KANJABUNG",
+      "type": "USPPS",
+      "apiBaseUrl": "http://36.92.125.247:33507",
+      "endpoint": "/kirim/dashkan/get",
+      "description": "USPPS API untuk laporan keuangan PT. KANJABUNG",
+      "authentication": {
+        "type": "custom",
+        "headers": {
+          "Device-Terminal": "VITE_KANJABUNG_DEVICE_TERMINAL",
+          "Signature": "VITE_KANJABUNG_SIGNATURE",
+          "Content-Type": "application/json"
+        },
+        "body": {
+          "request": "request_type",
+          "signature": "VITE_KANJABUNG_SIGNATURE",
+          "inptgljam": "YYYYMMDDHHMMSS"
+        }
+      },
+      "environmentVariables": {
+        "VITE_KANJABUNG_API_BASE_URL": "http://36.92.125.247:33507",
+        "VITE_KANJABUNG_DEVICE_TERMINAL": "6cb9051e5b3156d9816ba58b3dd4ca49",
+        "VITE_KANJABUNG_SIGNATURE": "6cb9051e5b3156d9816ba58b3dd4ca49"
+      },
+      "reports": [
+        {
+          "id": "balance-sheet",
+          "name": "Neraca Harian",
+          "requestType": "GetNeracaHarian",
+          "route": "/reports/pt-kanjabung/balance-sheet",
+          "component": "PtKanjabungBalanceSheetView",
+          "drilldown": false
+        },
+        {
+          "id": "pnl",
+          "name": "Laba Rugi Harian",
+          "requestType": "GetLabaRugiHarian",
+          "route": "/reports/pt-kanjabung/pnl",
+          "component": "PtKanjabungPnlView",
+          "drilldown": false
+        },
+        {
+          "id": "trial-balance",
+          "name": "Neraca Percobaan",
+          "requestType": "GetNeracaPercobaan",
+          "route": "/reports/pt-kanjabung/trial-balance",
+          "component": "PtKanjabungTrialBalanceView",
+          "drilldown": false
+        }
+      ]
+    }
+  ],
+  "services": {
+    "pt-jar": {
+      "service": "jabMartService.ts",
+      "functions": [
+        "fetchJarBalanceSheet",
+        "fetchJarProfitLoss",
+        "fetchJarTrialBalance",
+        "fetchJarLedger",
+        "fetchJarJournal"
+      ]
+    },
+    "pt-bprs": {
+      "service": "bprsService.ts",
+      "functions": [
+        "fetchBprsBalanceSheet",
+        "fetchBprsProfitLoss",
+        "fetchBprsTrialBalance",
+        "fetchBprsGlHistory"
+      ]
+    },
+    "pt-kanjabung": {
+      "service": "kanjabungService.ts",
+      "functions": [
+        "fetchKanjabungBalanceSheet",
+        "fetchKanjabungProfitLoss",
+        "fetchKanjabungTrialBalance"
+      ]
+    }
+  },
+  "mockData": {
+    "pt-bprs": "src/data/mockBprsReports.ts",
+    "pt-jar": "src/data/mockJarReports.ts",
+    "pt-kanjabung": "src/data/mockKanjabungReports.ts"
+  },
+  "types": {
+    "pt-bprs": "src/types/bprsReport.ts",
+    "pt-jar": "src/types/report.ts",
+    "pt-kanjabung": "src/types/kanjabungReport.ts"
+  },
+  "views": {
+    "pt-bprs": {
+      "balance-sheet": "src/views/ptBprs/PtBprsBalanceSheetView.vue",
+      "pnl": "src/views/ptBprs/PtBprsPnlView.vue",
+      "gl": "src/views/ptBprs/PtBprsGlView.vue",
+      "trial-balance": "src/views/ptBprs/PtBprsTrialBalanceView.vue"
+    },
+    "pt-jar": {
+      "balance-sheet": "src/views/ptJar/PtJarBalanceSheetView.vue",
+      "pnl": "src/views/ptJar/PtJarPnlView.vue",
+      "ledger": "src/views/ptJar/PtJarLedgerView.vue",
+      "trial-balance": "src/views/ptJar/PtJarTrialBalanceView.vue"
+    },
+    "pt-kanjabung": {
+      "balance-sheet": "src/views/ptKanjabung/PtKanjabungBalanceSheetView.vue",
+      "pnl": "src/views/ptKanjabung/PtKanjabungPnlView.vue",
+      "trial-balance": "src/views/ptKanjabung/PtKanjabungTrialBalanceView.vue"
+    }
+  }
+}

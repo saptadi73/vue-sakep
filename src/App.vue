@@ -15,6 +15,11 @@ const companyMenus = [
         key: 'balance-sheet',
       },
       {
+        to: '/reports/pt-jar/trial-balance',
+        label: 'Trial Balance',
+        key: 'trial-balance',
+      },
+      {
         to: '/reports/pt-jar/pnl',
         label: 'Profit and Loss',
         key: 'pnl',
@@ -31,7 +36,33 @@ const companyMenus = [
         key: 'balance-sheet',
       },
       {
+        to: '/reports/pt-bprs/trial-balance',
+        label: 'Trial Balance',
+        key: 'trial-balance',
+      },
+      {
         to: '/reports/pt-bprs/pnl',
+        label: 'Laba Rugi Harian',
+        key: 'pnl',
+      },
+    ],
+  },
+  {
+    company: 'USPPS-KANJABUNG',
+    code: 'USPPS-KANJABUNG',
+    links: [
+      {
+        to: '/reports/pt-uspps-kanjabung/balance-sheet',
+        label: 'Neraca Harian',
+        key: 'balance-sheet',
+      },
+      {
+        to: '/reports/pt-uspps-kanjabung/trial-balance',
+        label: 'Trial Balance',
+        key: 'trial-balance',
+      },
+      {
+        to: '/reports/pt-uspps-kanjabung/pnl',
         label: 'Laba Rugi Harian',
         key: 'pnl',
       },

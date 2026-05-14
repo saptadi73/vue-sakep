@@ -76,6 +76,8 @@ const loadGl = async () => {
 const goBack = () => {
   if (fromPage === 'pnl') {
     router.push({ name: 'pt-bprs-pnl' })
+  } else if (fromPage === 'trial-balance') {
+    router.push({ name: 'pt-bprs-trial-balance' })
   } else {
     router.push({ name: 'pt-bprs-balance-sheet' })
   }

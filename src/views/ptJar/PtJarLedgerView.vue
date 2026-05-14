@@ -210,6 +210,8 @@ const exportJurnalExcel = () => {
 const goBack = () => {
   if (fromPage === 'pnl') {
     router.push({ name: 'pt-jar-pnl' })
+  } else if (fromPage === 'trial-balance') {
+    router.push({ name: 'pt-jar-trial-balance' })
   } else {
     router.push({ name: 'pt-jar-balance-sheet' })
   }

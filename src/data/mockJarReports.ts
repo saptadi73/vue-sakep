@@ -17,6 +17,94 @@ export const mockJarBalanceSheet: ReportRow[] = [
   { Account: '3201', Description: 'Laba Ditahan', Amount: '45,125,040.00', PadLeft: 2 },
 ]
 
+export const mockJarTrialBalance: ReportRow[] = [
+  {
+    Account: '1101',
+    Description: 'Kas Di Tangan',
+    Amount: '13,648,521.00',
+    Amount1: null,
+    PadLeft: 1,
+  },
+  {
+    Account: '1102',
+    Description: 'Kas Di Bank',
+    Amount: '45,896,969.00',
+    Amount1: null,
+    PadLeft: 1,
+  },
+  {
+    Account: '1110',
+    Description: 'Piutang Usaha',
+    Amount: '18,125,250.00',
+    Amount1: null,
+    PadLeft: 1,
+  },
+  {
+    Account: '1201',
+    Description: 'Aset Tetap',
+    Amount: '92,450,000.00',
+    Amount1: null,
+    PadLeft: 1,
+  },
+  {
+    Account: '2101',
+    Description: 'Utang Usaha',
+    Amount: null,
+    Amount1: '24,995,700.00',
+    PadLeft: 1,
+  },
+  {
+    Account: '3101',
+    Description: 'Modal Disetor',
+    Amount: null,
+    Amount1: '100,000,000.00',
+    PadLeft: 1,
+  },
+  {
+    Account: '3201',
+    Description: 'Laba Ditahan',
+    Amount: null,
+    Amount1: '45,125,040.00',
+    PadLeft: 1,
+  },
+  {
+    Account: '4101',
+    Description: 'Penjualan Bersih',
+    Amount: null,
+    Amount1: '188,542,330.00',
+    PadLeft: 1,
+  },
+  {
+    Account: '5101',
+    Description: 'Harga Pokok Penjualan',
+    Amount: '114,925,870.00',
+    Amount1: null,
+    PadLeft: 1,
+  },
+  {
+    Account: '6101',
+    Description: 'Gaji dan Tunjangan',
+    Amount: '21,200,000.00',
+    Amount1: null,
+    PadLeft: 1,
+  },
+  { Account: '6102', Description: 'Sewa', Amount: '7,800,000.00', Amount1: null, PadLeft: 1 },
+  {
+    Account: '6103',
+    Description: 'Listrik dan Air',
+    Amount: '2,230,450.00',
+    Amount1: null,
+    PadLeft: 1,
+  },
+  {
+    Account: '6999',
+    Description: 'Laba Bersih',
+    Amount: null,
+    Amount1: '42,386,010.00',
+    PadLeft: 1,
+  },
+]
+
 export const mockJarProfitLoss: ReportRow[] = [
   { Account: '4', Description: 'PENDAPATAN', Amount: null, PadLeft: 0 },
   { Account: '4101', Description: 'Penjualan Bersih', Amount: '188,542,330.00', PadLeft: 1 },

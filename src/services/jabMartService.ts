@@ -3,6 +3,7 @@ import {
   mockJarJurnalByAccount,
   mockJarLedgerByAccount,
   mockJarProfitLoss,
+  mockJarTrialBalance,
 } from '@/data/mockJarReports'
 import type {
   FinancialApiResponse,
@@ -234,6 +235,12 @@ export const fetchJarProfitLoss = async (
   params: JarReportRequestParams,
 ): Promise<FinancialReportResult> => {
   return fetchJarReport('labarugi', params, mockJarProfitLoss)
+}
+
+export const fetchJarTrialBalance = async (
+  params: JarReportRequestParams,
+): Promise<FinancialReportResult> => {
+  return fetchJarReport('neraca', params, mockJarTrialBalance)
 }
 
 const createLedgerFallbackResult = (

@@ -1,24 +1,19 @@
 import {
-  mockBprsBalanceSheet,
-  mockBprsProfitLoss,
-  mockBprsTrialBalance,
-} from '@/data/mockBprsReports'
+  mockUspsKanjabungBalanceSheet,
+  mockUspsKanjabungProfitLoss,
+  mockUspsKanjabungTrialBalance,
+} from '@/data/mockUspsKanjabungReports'
 import type { ReportRow } from '@/types/report'
 import type {
-  BprsApiResponse,
-  BprsGlDebugInfo,
-  BprsGlRequestParams,
-  BprsGlResult,
-  BprsGlRow,
-  BprsReportRequestParams,
-  BprsReportResult,
-} from '@/types/bprsReport'
+  UspsKanjabungApiResponse,
+  UspsKanjabungReportRequestParams,
+  UspsKanjabungReportResult,
+} from '@/types/usppsKanjabungReport'
 
-const API_BASE_URL = import.meta.env.VITE_BPRS_API_BASE_URL ?? '/api/bprs'
+const API_BASE_URL = import.meta.env.VITE_USPPS_KANJABUNG_API_BASE_URL ?? '/api/uspps-kanjabung'
 
 const ENDPOINT = `${API_BASE_URL}/kirim/dashkan/get`
 const REPORT_REQUEST_TIMEOUT_MS = 12000
-const GL_REQUEST_TIMEOUT_MS = 45000
 
 const isRelativeApiBaseUrl = (value: string) => value.startsWith('/')
 const getProdApiConfigError = (): string | null => {
@@ -28,8 +23,8 @@ const getProdApiConfigError = (): string | null => {
 
   if (isRelativeApiBaseUrl(API_BASE_URL)) {
     return [
-      'Konfigurasi API BPRS production belum benar.',
-      'Set VITE_BPRS_API_BASE_URL ke URL backend/proxy yang menerima POST',
+      'Konfigurasi API USPPS-KANJABUNG production belum benar.',
+      'Set VITE_USPPS_KANJABUNG_API_BASE_URL ke URL backend/proxy yang menerima POST',
       `(sekarang: ${API_BASE_URL}).`,
     ].join(' ')
   }
@@ -37,9 +32,8 @@ const getProdApiConfigError = (): string | null => {
   return null
 }
 
-const DEFAULT_USER = import.meta.env.VITE_BPRS_USER ?? 'System'
-const DEFAULT_SIGNATURE = import.meta.env.VITE_BPRS_SIGNATURE ?? ''
-const DEFAULT_DEVICE = import.meta.env.VITE_BPRS_DEVICE ?? 'Denmas'
+const DEFAULT_DEVICE_TERMINAL = import.meta.env.VITE_USPPS_KANJABUNG_DEVICE_TERMINAL ?? ''
+const DEFAULT_SIGNATURE = import.meta.env.VITE_USPPS_KANJABUNG_SIGNATURE ?? ''
 
 const buildTimestamp = (): string => {
   const now = new Date()
@@ -54,7 +48,7 @@ const buildTimestamp = (): string => {
   )
 }
 
-const createFallbackResult = (rows: ReportRow[], reason: string): BprsReportResult => ({
+const createFallbackResult = (rows: ReportRow[], reason: string): UspsKanjabungReportResult => ({
   header: { status: 'MOCK', message: 'Using fallback data' },
   data: rows,
   source: 'mock',
@@ -82,11 +76,11 @@ const toReportRows = (rows: unknown[]): ReportRow[] => {
     (row): row is Record<string, unknown> => row !== null && typeof row === 'object',
   )
 
-  const hasHierarchicalBprsShape = normalizedRows.some(
+  const hasHierarchicalShape = normalizedRows.some(
     (row) => row.section !== undefined || row.nobb !== undefined || row.nosbb !== undefined,
   )
 
-  if (!hasHierarchicalBprsShape) {
+  if (!hasHierarchicalShape) {
     return normalizedRows.map((row) => {
       const account = String(row.nosbb ?? row.nobb ?? row.Account ?? '').trim()
       const description = String(
@@ -198,26 +192,25 @@ const buildReportHeader = (payload: Record<string, unknown>) => {
   }
 }
 
-const fetchBprsReport = async (
+const fetchUspsKanjabungReport = async (
   requestType: string,
-  params: BprsReportRequestParams,
+  params: UspsKanjabungReportRequestParams,
   fallbackRows: ReportRow[],
-): Promise<BprsReportResult> => {
+): Promise<UspsKanjabungReportResult> => {
   const apiConfigError = getProdApiConfigError()
   if (apiConfigError) {
     return createFallbackResult(fallbackRows, apiConfigError)
   }
 
-  if (!DEFAULT_SIGNATURE) {
+  if (!DEFAULT_SIGNATURE || !DEFAULT_DEVICE_TERMINAL) {
     return createFallbackResult(
       fallbackRows,
-      'VITE_BPRS_SIGNATURE belum diset. Silakan tambahkan di file .env.local.',
+      'VITE_USPPS_KANJABUNG_SIGNATURE dan/atau VITE_USPPS_KANJABUNG_DEVICE_TERMINAL belum diset. Silakan tambahkan di file .env.local.',
     )
   }
 
   const body = {
     request: requestType,
-    userid: DEFAULT_USER,
     signature: DEFAULT_SIGNATURE,
     inptgljam: buildTimestamp(),
     data01: {
@@ -234,7 +227,8 @@ const fetchBprsReport = async (
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'Device-Terminal': DEFAULT_DEVICE,
+        'Device-Terminal': DEFAULT_DEVICE_TERMINAL,
+        Signature: DEFAULT_SIGNATURE,
       },
       body: JSON.stringify(body),
       signal: controller.signal,
@@ -266,183 +260,23 @@ const fetchBprsReport = async (
         ? `Request timeout setelah ${REPORT_REQUEST_TIMEOUT_MS / 1000} detik`
         : error instanceof Error
           ? error.message
-          : 'Unknown error saat memuat laporan BPRS'
+          : 'Unknown error saat memuat laporan USPPS-KANJABUNG'
 
     return createFallbackResult(fallbackRows, message)
   }
 }
 
-export const fetchBprsBalanceSheet = (params: BprsReportRequestParams): Promise<BprsReportResult> =>
-  fetchBprsReport('GetNeracaHarian', params, mockBprsBalanceSheet)
+export const fetchUspsKanjabungBalanceSheet = (
+  params: UspsKanjabungReportRequestParams,
+): Promise<UspsKanjabungReportResult> =>
+  fetchUspsKanjabungReport('GetNeracaHarian', params, mockUspsKanjabungBalanceSheet)
 
-export const fetchBprsProfitLoss = (params: BprsReportRequestParams): Promise<BprsReportResult> =>
-  fetchBprsReport('GetLabaRugiHarian', params, mockBprsProfitLoss)
+export const fetchUspsKanjabungProfitLoss = (
+  params: UspsKanjabungReportRequestParams,
+): Promise<UspsKanjabungReportResult> =>
+  fetchUspsKanjabungReport('GetLabaRugiHarian', params, mockUspsKanjabungProfitLoss)
 
-export const fetchBprsTrialBalance = (params: BprsReportRequestParams): Promise<BprsReportResult> =>
-  fetchBprsReport('GetNeracaPercobaan', params, mockBprsTrialBalance)
-
-const extractGlRows = (payload: unknown): BprsGlRow[] => {
-  if (!payload || typeof payload !== 'object') return []
-
-  const root = payload as Record<string, unknown>
-  const candidateKeys = ['HistACC', 'data', 'data01', 'detail', 'rows', 'result']
-
-  for (const key of candidateKeys) {
-    const value = root[key]
-    if (Array.isArray(value)) {
-      return value.filter((item): item is BprsGlRow => item !== null && typeof item === 'object')
-    }
-  }
-
-  const single = root.data
-  if (single && typeof single === 'object' && !Array.isArray(single)) {
-    return [single as BprsGlRow]
-  }
-
-  return []
-}
-
-const buildGlHeader = (payload: Record<string, unknown>) => {
-  if (payload.header && typeof payload.header === 'object') {
-    const hdr = payload.header as Record<string, unknown>
-    return {
-      status: String(hdr.status ?? hdr.Status ?? ''),
-      message: String(hdr.message ?? hdr.ResponseText ?? ''),
-    }
-  }
-
-  return {
-    status: String(payload.rcode ?? payload.status ?? ''),
-    message: String(payload.msg ?? payload.message ?? ''),
-  }
-}
-
-export const fetchBprsGlHistory = async (params: BprsGlRequestParams): Promise<BprsGlResult> => {
-  const apiConfigError = getProdApiConfigError()
-
-  const body = {
-    request: 'GetHistACC',
-    userid: DEFAULT_USER,
-    signature: DEFAULT_SIGNATURE,
-    inptgljam: buildTimestamp(),
-    data01: {
-      unit: params.unit,
-      tgl1: params.tgl1,
-      tgl2: params.tgl2,
-      nosbb: params.nosbb,
-    },
-  }
-
-  const debug: BprsGlDebugInfo = {
-    endpoint: ENDPOINT,
-    requestHeaders: {
-      'Content-Type': 'application/json',
-      'Device-Terminal': DEFAULT_DEVICE,
-    },
-    requestPayload: body,
-  }
-
-  if (!DEFAULT_SIGNATURE) {
-    debug.error = 'VITE_BPRS_SIGNATURE belum diset. Request tidak dikirim ke API.'
-
-    return {
-      header: { status: 'MOCK', message: 'Using fallback data' },
-      data: [],
-      source: 'mock',
-      note: 'VITE_BPRS_SIGNATURE belum diset. Silakan tambahkan di file .env.local.',
-      debug,
-    }
-  }
-
-  if (apiConfigError) {
-    debug.error = apiConfigError
-
-    return {
-      header: { status: 'MOCK', message: 'Using fallback data' },
-      data: [],
-      source: 'mock',
-      note: apiConfigError,
-      debug,
-    }
-  }
-
-  try {
-    const requestOnce = async () => {
-      const controller = new AbortController()
-      const timeoutId = window.setTimeout(() => controller.abort(), GL_REQUEST_TIMEOUT_MS)
-
-      try {
-        const response = await fetch(ENDPOINT, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Device-Terminal': DEFAULT_DEVICE,
-          },
-          body: JSON.stringify(body),
-          signal: controller.signal,
-        })
-
-        return response
-      } finally {
-        window.clearTimeout(timeoutId)
-      }
-    }
-
-    let response: Response
-    try {
-      response = await requestOnce()
-    } catch (error) {
-      if (error instanceof DOMException && error.name === 'AbortError') {
-        // Retry once because this endpoint can occasionally be slow/intermittent.
-        response = await requestOnce()
-      } else {
-        throw error
-      }
-    }
-
-    debug.responseStatus = response.status
-    const responseRaw = await response.text()
-    debug.responseRaw = responseRaw
-
-    let payload: Record<string, unknown> = {}
-    if (responseRaw.trim()) {
-      try {
-        payload = JSON.parse(responseRaw) as Record<string, unknown>
-      } catch {
-        throw new Error('Respons GL bukan JSON yang valid')
-      }
-    }
-    debug.responseJson = payload
-
-    if (!response.ok) {
-      throw new Error(`API returned status ${response.status}`)
-    }
-
-    const rows = extractGlRows(payload)
-    const header = buildGlHeader(payload)
-
-    return {
-      header,
-      data: rows,
-      source: 'live',
-      note: rows.length === 0 ? header.message || 'Data Tidak Ditemukan' : undefined,
-      debug,
-    }
-  } catch (error) {
-    const message =
-      error instanceof DOMException && error.name === 'AbortError'
-        ? `Request timeout setelah ${GL_REQUEST_TIMEOUT_MS / 1000} detik (sudah retry 1x)`
-        : error instanceof Error
-          ? error.message
-          : 'Unknown error saat memuat GL BPRS'
-    debug.error = message
-
-    return {
-      header: { status: 'MOCK', message: 'Using fallback data' },
-      data: [],
-      source: 'mock',
-      note: message,
-      debug,
-    }
-  }
-}
+export const fetchUspsKanjabungTrialBalance = (
+  params: UspsKanjabungReportRequestParams,
+): Promise<UspsKanjabungReportResult> =>
+  fetchUspsKanjabungReport('GetNeracaPercobaan', params, mockUspsKanjabungTrialBalance)
