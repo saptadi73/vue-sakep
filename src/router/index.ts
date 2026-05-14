@@ -10,13 +10,16 @@ import PtBprsTrialBalanceView from '@/views/ptBprs/PtBprsTrialBalanceView.vue'
 import PtUspsKanjabungBalanceSheetView from '@/views/ptUspsKanjabung/PtUspsKanjabungBalanceSheetView.vue'
 import PtUspsKanjabungPnlView from '@/views/ptUspsKanjabung/PtUspsKanjabungPnlView.vue'
 import PtUspsKanjabungTrialBalanceView from '@/views/ptUspsKanjabung/PtUspsKanjabungTrialBalanceView.vue'
+import OdooLoginView from '@/views/odoo/OdooLoginView.vue'
+import OdooFinanceReportsView from '@/views/odoo/OdooFinanceReportsView.vue'
+import { useOdooAuthStore } from '@/stores/odooAuth'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: '/',
-      redirect: '/reports/pt-jar/balance-sheet',
+      redirect: '/odoo/login',
     },
     {
       path: '/reports/pt-jar/balance-sheet',
@@ -73,7 +76,48 @@ const router = createRouter({
       name: 'pt-uspps-kanjabung-trial-balance',
       component: PtUspsKanjabungTrialBalanceView,
     },
+    {
+      path: '/odoo/login',
+      name: 'odoo-login',
+      component: OdooLoginView,
+      meta: { guestOnly: true },
+    },
+    {
+      path: '/odoo/reports/:companyCode(kan-jabung|pt-jgi)',
+      name: 'odoo-reports',
+      component: OdooFinanceReportsView,
+      meta: { requiresAuth: true },
+    },
   ],
+})
+
+router.beforeEach((to) => {
+  const authStore = useOdooAuthStore()
+  const isDashboardRoute = to.path.startsWith('/reports') || to.path.startsWith('/odoo/reports')
+
+  if (to.path === '/') {
+    return authStore.isAuthenticated ? '/odoo/reports/kan-jabung' : '/odoo/login'
+  }
+
+  if (isDashboardRoute && !authStore.isAuthenticated) {
+    return {
+      path: '/odoo/login',
+      query: { redirect: to.fullPath },
+    }
+  }
+
+  if (to.meta.requiresAuth && !authStore.isAuthenticated) {
+    return {
+      path: '/odoo/login',
+      query: { redirect: to.fullPath },
+    }
+  }
+
+  if (to.meta.guestOnly && authStore.isAuthenticated) {
+    return '/odoo/reports/kan-jabung'
+  }
+
+  return true
 })
 
 export default router

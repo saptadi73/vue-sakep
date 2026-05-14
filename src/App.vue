@@ -1,8 +1,12 @@
 <script setup lang="ts">
-import { RouterLink, RouterView, useRoute } from 'vue-router'
+import { computed } from 'vue'
+import { RouterLink, RouterView, useRoute, useRouter } from 'vue-router'
 import iconLaporan from '@/asset/icon/icon_laporan.png'
+import { useOdooAuthStore } from '@/stores/odooAuth'
 
 const route = useRoute()
+const router = useRouter()
+const authStore = useOdooAuthStore()
 
 const companyMenus = [
   {
@@ -71,10 +75,45 @@ const companyMenus = [
 ]
 
 const isActive = (path: string) => route.path === path
+const isLoginRoute = computed(() => route.path === '/odoo/login')
+
+const odooMenus = computed(() => {
+  if (!authStore.isAuthenticated) {
+    return [
+      {
+        to: '/odoo/login',
+        label: 'Login Odoo',
+        key: 'login',
+      },
+    ]
+  }
+
+  return [
+    {
+      to: '/odoo/reports/kan-jabung',
+      label: 'KAN JABUNG (Utama)',
+      key: 'kan-jabung',
+    },
+    {
+      to: '/odoo/reports/pt-jgi',
+      label: 'PT. JGI (Tambahan)',
+      key: 'pt-jgi',
+    },
+  ]
+})
+
+const logoutOdoo = async () => {
+  authStore.logout()
+  await router.push('/odoo/login')
+}
 </script>
 
 <template>
-  <div class="app-shell">
+  <main v-if="isLoginRoute" class="login-content-panel">
+    <RouterView />
+  </main>
+
+  <div v-else class="app-shell">
     <aside class="side-panel">
       <div class="brand-panel">
         <img :src="iconLaporan" alt="Icon laporan" class="brand-icon" />
@@ -98,6 +137,28 @@ const isActive = (path: string) => route.path === path
             {{ link.label }}
           </RouterLink>
         </section>
+
+        <section class="company-block odoo-block">
+          <p class="company-title">Odoo Finance</p>
+          <RouterLink
+            v-for="link in odooMenus"
+            :key="link.key"
+            :to="link.to"
+            class="menu-link"
+            :class="{ active: isActive(link.to) }"
+          >
+            {{ link.label }}
+          </RouterLink>
+
+          <button
+            v-if="authStore.isAuthenticated"
+            type="button"
+            class="logout-btn"
+            @click="logoutOdoo"
+          >
+            Logout Session Odoo
+          </button>
+        </section>
       </nav>
     </aside>
 
@@ -113,6 +174,11 @@ const isActive = (path: string) => route.path === path
   grid-template-columns: minmax(260px, 320px) 1fr;
   min-height: 100vh;
   gap: 1rem;
+  padding: 1.1rem;
+}
+
+.login-content-panel {
+  min-height: 100vh;
   padding: 1.1rem;
 }
 
@@ -185,6 +251,11 @@ h1 {
   font-size: 0.9rem;
 }
 
+.odoo-block {
+  border-color: rgba(129, 214, 196, 0.45);
+  background: linear-gradient(180deg, rgba(35, 105, 143, 0.24), rgba(34, 141, 108, 0.25));
+}
+
 .menu-link {
   display: block;
   padding: 0.52rem 0.62rem;
@@ -205,6 +276,23 @@ h1 {
   background: #f5f9ff;
   color: #11325b;
   font-weight: 700;
+}
+
+.logout-btn {
+  margin-top: 0.4rem;
+  min-height: 38px;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 232, 232, 0.75);
+  background: rgba(145, 30, 45, 0.78);
+  color: #fff0f0;
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.logout-btn:hover {
+  background: rgba(163, 32, 49, 0.92);
 }
 
 .content-panel {

@@ -54,6 +54,32 @@ credentials: "include"
 
 Server juga perlu disiapkan untuk CORS dan cookie policy jika frontend beda domain.
 
+Untuk deployment saat ini, API finance reports membuka CORS default untuk:
+
+```text
+https://sakep.kanjabung.com
+```
+
+Backend juga mengirim:
+
+```text
+Access-Control-Allow-Credentials: true
+```
+
+Jika origin frontend berubah, set environment variable Odoo:
+
+```text
+FINANCE_REPORTS_CORS_ORIGIN=https://sakep.kanjabung.com
+```
+
+Untuk lebih dari satu origin, pisahkan dengan koma:
+
+```text
+FINANCE_REPORTS_CORS_ORIGIN=https://sakep.kanjabung.com,https://frontend-lain.kanjabung.com
+```
+
+Jika benar-benar ingin membuka untuk semua origin, isi `*`. Karena endpoint memakai cookie session, backend akan memantulkan origin request, bukan mengirim wildcard langsung.
+
 ## Halaman Login Frontend
 
 Frontend perlu menyediakan halaman login sendiri sebelum user membuka dashboard finance reports.
