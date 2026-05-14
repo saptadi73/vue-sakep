@@ -91,8 +91,44 @@ const postRpc = async <T, P extends object>(endpoint: string, params: P): Promis
   return json.data
 }
 
+const toSafeNumber = (value: unknown): number | null => {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return null
+  }
+
+  return value
+}
+
+const normalizeUserSession = (value: unknown, fallbackDb: string): OdooUserSession => {
+  if (!value || typeof value !== 'object') {
+    throw new Error('Response login Odoo tidak valid: data user tidak ditemukan.')
+  }
+
+  const raw = value as Partial<OdooUserSession>
+  const companyIds = Array.isArray(raw.company_ids)
+    ? raw.company_ids.filter((id): id is number => typeof id === 'number' && !Number.isNaN(id))
+    : []
+
+  const companyId = toSafeNumber(raw.company_id) ?? companyIds[0] ?? 0
+
+  return {
+    uid: toSafeNumber(raw.uid) ?? 0,
+    session_id: typeof raw.session_id === 'string' ? raw.session_id : undefined,
+    db: typeof raw.db === 'string' && raw.db.trim() !== '' ? raw.db : fallbackDb,
+    login: typeof raw.login === 'string' ? raw.login : '',
+    name: typeof raw.name === 'string' ? raw.name : '',
+    company_id: companyId,
+    company_name: typeof raw.company_name === 'string' ? raw.company_name : '',
+    company_ids: companyIds.length ? companyIds : companyId ? [companyId] : [],
+  }
+}
+
 export const authenticateOdoo = async (payload: OdooAuthPayload): Promise<OdooUserSession> => {
-  return postRpc<OdooUserSession, OdooAuthPayload>('/api/accounting/authenticate', payload)
+  const rawSession = await postRpc<unknown, OdooAuthPayload>(
+    '/api/accounting/authenticate',
+    payload,
+  )
+  return normalizeUserSession(rawSession, payload.db)
 }
 
 export const fetchOdooCompanies = async (): Promise<OdooCompaniesPayload> => {

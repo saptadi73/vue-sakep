@@ -10,6 +10,51 @@ interface PersistedAuthSession {
   activeCompanyId: number | null
 }
 
+const toSafeNumber = (value: unknown): number | null => {
+  if (typeof value !== 'number' || Number.isNaN(value)) {
+    return null
+  }
+
+  return value
+}
+
+const normalizePersistedSession = (value: unknown): PersistedAuthSession | null => {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const raw = value as {
+    user?: Partial<OdooUserSession>
+    activeCompanyId?: unknown
+  }
+
+  if (!raw.user || typeof raw.user !== 'object') {
+    return null
+  }
+
+  const companyIds = Array.isArray(raw.user.company_ids)
+    ? raw.user.company_ids.filter((id): id is number => typeof id === 'number' && !Number.isNaN(id))
+    : []
+
+  const companyId = toSafeNumber(raw.user.company_id) ?? companyIds[0] ?? 0
+
+  const normalizedUser: OdooUserSession = {
+    uid: toSafeNumber(raw.user.uid) ?? 0,
+    session_id: typeof raw.user.session_id === 'string' ? raw.user.session_id : undefined,
+    db: typeof raw.user.db === 'string' ? raw.user.db : '',
+    login: typeof raw.user.login === 'string' ? raw.user.login : '',
+    name: typeof raw.user.name === 'string' ? raw.user.name : '',
+    company_id: companyId,
+    company_name: typeof raw.user.company_name === 'string' ? raw.user.company_name : '',
+    company_ids: companyIds.length ? companyIds : companyId ? [companyId] : [],
+  }
+
+  return {
+    user: normalizedUser,
+    activeCompanyId: toSafeNumber(raw.activeCompanyId),
+  }
+}
+
 const readPersistedSession = (): PersistedAuthSession | null => {
   if (typeof window === 'undefined') {
     return null
@@ -21,7 +66,15 @@ const readPersistedSession = (): PersistedAuthSession | null => {
   }
 
   try {
-    return JSON.parse(raw) as PersistedAuthSession
+    const parsed = JSON.parse(raw) as unknown
+    const normalized = normalizePersistedSession(parsed)
+
+    if (!normalized) {
+      window.localStorage.removeItem(STORAGE_KEY)
+      return null
+    }
+
+    return normalized
   } catch {
     window.localStorage.removeItem(STORAGE_KEY)
     return null
@@ -56,10 +109,14 @@ export const useOdooAuthStore = defineStore('odoo-auth', () => {
     window.localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
   }
 
-  const setUserSession = (session: OdooUserSession) => {
+  const setUserSession = (session: OdooUserSession | null | undefined) => {
+    if (!session) {
+      throw new Error('Session login Odoo tidak valid.')
+    }
+
     user.value = session
 
-    if (session.company_id) {
+    if (typeof session.company_id === 'number' && !Number.isNaN(session.company_id)) {
       activeCompanyId.value = session.company_id
     } else if (Array.isArray(session.company_ids) && session.company_ids.length) {
       activeCompanyId.value = session.company_ids[0] ?? null
@@ -89,14 +146,18 @@ export const useOdooAuthStore = defineStore('odoo-auth', () => {
     }
 
     const response = await fetchOdooCompanies()
-    companies.value = response.companies
+    const safeCompanies = Array.isArray(response.companies) ? response.companies : []
+    companies.value = safeCompanies
 
-    if (response.active_company_id) {
+    if (
+      typeof response.active_company_id === 'number' &&
+      !Number.isNaN(response.active_company_id)
+    ) {
       activeCompanyId.value = response.active_company_id
     }
 
-    if (!activeCompanyId.value && response.companies.length > 0) {
-      activeCompanyId.value = response.companies[0]?.id ?? null
+    if (!activeCompanyId.value && safeCompanies.length > 0) {
+      activeCompanyId.value = safeCompanies[0]?.id ?? null
     }
 
     persistSession()

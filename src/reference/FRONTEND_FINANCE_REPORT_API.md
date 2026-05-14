@@ -66,10 +66,18 @@ Backend juga mengirim:
 Access-Control-Allow-Credentials: true
 ```
 
-Jika origin frontend berubah, set environment variable Odoo:
+Browser akan mengirim preflight `OPTIONS` untuk request JSON lintas domain. Backend finance reports menyediakan route `OPTIONS` khusus untuk endpoint `/api/accounting/*`; jika production masih membalas `405 METHOD NOT ALLOWED` pada preflight, berarti kode terbaru belum ter-load oleh Odoo, service belum direstart setelah upgrade, atau request `OPTIONS` ditahan di reverse proxy sebelum sampai ke Odoo.
+
+Jika origin frontend berubah, set environment variable pada proses backend Odoo:
 
 ```text
 FINANCE_REPORTS_CORS_ORIGIN=https://sakep.kanjabung.com
+```
+
+Variable ini bukan `.env` frontend Vue. `.env` frontend cukup mengarah ke base URL Odoo, misalnya:
+
+```text
+VITE_ODOO_BASE_URL=https://siskab.kanjabung.com
 ```
 
 Untuk lebih dari satu origin, pisahkan dengan koma:
