@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { buildConsolidationPreview } from '@/services/consolidationEngineService'
-import { loadConsolidationConfig, saveConsolidationConfig } from '@/services/consolidationConfigService'
+import {
+  loadConsolidationConfig,
+  saveConsolidationConfig,
+} from '@/services/consolidationConfigService'
 import type { CoaMappingRule } from '@/types/consolidationConfig'
 import type { ConsolidationPreviewResult } from '@/types/consolidationResult'
 import type { ConsolidationSection } from '@/types/consolidationConfig'
@@ -74,8 +77,7 @@ const applySuggestionsToConfig = () => {
   let added = 0
 
   for (const draft of mappingDrafts.value) {
-    const dedupeKey =
-      `${draft.entityId}|${draft.section}|${draft.sourceAccount}|${draft.consolidationKey}`
+    const dedupeKey = `${draft.entityId}|${draft.section}|${draft.sourceAccount}|${draft.consolidationKey}`
     if (existingKeys.has(dedupeKey)) {
       continue
     }
@@ -86,7 +88,7 @@ const applySuggestionsToConfig = () => {
   }
 
   if (added === 0) {
-    statusMessage.value = 'Tidak ada suggestion baru yang ditambahkan (semua sudah ada).' 
+    statusMessage.value = 'Tidak ada suggestion baru yang ditambahkan (semua sudah ada).'
     return
   }
 
@@ -278,7 +280,9 @@ const applySuggestionsToConfig = () => {
           </thead>
           <tbody>
             <tr v-if="topSuggestions.length === 0">
-              <td colspan="6" class="empty">Belum ada suggestion (cek mapping/report tree untuk section ini).</td>
+              <td colspan="6" class="empty">
+                Belum ada suggestion (cek mapping/report tree untuk section ini).
+              </td>
             </tr>
             <tr
               v-for="item in topSuggestions"

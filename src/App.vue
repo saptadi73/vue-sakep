@@ -87,6 +87,14 @@ const consolidationMenus = [
   },
 ]
 
+const helpMenus = [
+  {
+    to: '/help/consolidation-config',
+    label: 'Panduan Update Config JSON',
+    key: 'help-consolidation-config',
+  },
+]
+
 const isActive = (path: string) => route.path === path
 const isLoginRoute = computed(() => route.path === '/odoo/login')
 
@@ -177,6 +185,19 @@ const logoutOdoo = async () => {
           <p class="company-title">Konsolidasi</p>
           <RouterLink
             v-for="link in consolidationMenus"
+            :key="link.key"
+            :to="link.to"
+            class="menu-link"
+            :class="{ active: isActive(link.to) }"
+          >
+            {{ link.label }}
+          </RouterLink>
+        </section>
+
+        <section class="company-block help-block">
+          <p class="company-title">Help</p>
+          <RouterLink
+            v-for="link in helpMenus"
             :key="link.key"
             :to="link.to"
             class="menu-link"
@@ -285,6 +306,11 @@ h1 {
 .consolidation-block {
   border-color: rgba(243, 177, 112, 0.52);
   background: linear-gradient(180deg, rgba(131, 73, 20, 0.34), rgba(189, 114, 48, 0.2));
+}
+
+.help-block {
+  border-color: rgba(145, 161, 182, 0.5);
+  background: linear-gradient(180deg, rgba(33, 56, 80, 0.28), rgba(48, 74, 102, 0.18));
 }
 
 .menu-link {

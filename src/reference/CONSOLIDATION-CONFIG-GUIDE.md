@@ -25,15 +25,24 @@ Field utama:
 
 ## Cara Edit dari UI Frontend
 
-1. Buka menu Konsolidasi > Config Aggregasi & Eliminasi.
-2. Route: /consolidation/config.
-3. Edit JSON di editor.
-4. Klik Simpan Config untuk validasi + simpan ke browser localStorage.
-5. Gunakan Export JSON untuk backup/commit, dan Import JSON untuk memuat file revisi.
-6. Buka menu Konsolidasi > Preview Agregasi & Eliminasi (route: /consolidation/preview).
-7. Pilih section report lalu klik Hitung Ulang Preview untuk melihat before/elimination/after.
-8. Cek Suggested Mapping Draft untuk akun yang belum termapping.
-9. Klik Tambahkan Suggestion ke Config untuk menambahkan draft mapping ke config aktif.
+1. Buka menu Help > Panduan Update Config JSON.
+2. Atau akses route help: /help/consolidation-config.
+3. Buka menu Konsolidasi > Config Aggregasi & Eliminasi.
+4. Route: /consolidation/config.
+3. Pilih Mode Tabel untuk edit model baris-kolom seperti spreadsheet.
+4. Ubah nilai per sel pada tabel Entities, COA Mappings, Report Tree, dan Elimination Rules.
+5. Klik Simpan Config untuk validasi + simpan ke browser localStorage.
+6. Gunakan Export JSON untuk backup/commit, dan Import JSON untuk memuat file revisi.
+7. Buka menu Konsolidasi > Preview Agregasi & Eliminasi (route: /consolidation/preview).
+8. Pilih section report lalu klik Hitung Ulang Preview untuk melihat before/elimination/after.
+9. Cek Suggested Mapping Draft untuk akun yang belum termapping.
+10. Klik Tambahkan Suggestion ke Config untuk menambahkan draft mapping ke config aktif.
+
+Catatan:
+
+- Mode JSON tetap tersedia untuk edit raw JSON langsung.
+- Data pada Mode Tabel dan Mode JSON selalu sinkron pada draft yang sama.
+- File aslinya tetap berbentuk JSON saat import/export.
 
 ## Apa yang Perlu Ditambahkan oleh Tim
 
@@ -50,6 +59,8 @@ Field utama:
 - Source Summary: jumlah row termapping vs belum termapping per entitas.
 - Top Unmapped Accounts: daftar akun yang masih belum punya rule mapping.
 - Suggested Mapping Draft: rekomendasi mapping otomatis berdasarkan prefix akun dan kata kunci deskripsi.
+
+Dokumen ringkas untuk menu Help aplikasi juga tersedia di src/reference/CONSOLIDATION-CONFIG-HELP.md.
 
 ## Rekomendasi Governance
 

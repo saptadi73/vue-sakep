@@ -14,6 +14,7 @@ import OdooLoginView from '@/views/odoo/OdooLoginView.vue'
 import OdooFinanceReportsView from '@/views/odoo/OdooFinanceReportsView.vue'
 import ConsolidationConfigView from '@/views/consolidation/ConsolidationConfigView.vue'
 import ConsolidationPreviewView from '@/views/consolidation/ConsolidationPreviewView.vue'
+import ConsolidationConfigHelpView from '@/views/help/ConsolidationConfigHelpView.vue'
 import { useOdooAuthStore } from '@/stores/odooAuth'
 
 const router = createRouter({
@@ -102,6 +103,12 @@ const router = createRouter({
       component: ConsolidationPreviewView,
       meta: { requiresAuth: true },
     },
+    {
+      path: '/help/consolidation-config',
+      name: 'help-consolidation-config',
+      component: ConsolidationConfigHelpView,
+      meta: { requiresAuth: true },
+    },
   ],
 })
 
@@ -110,7 +117,8 @@ router.beforeEach((to) => {
   const isDashboardRoute =
     to.path.startsWith('/reports') ||
     to.path.startsWith('/odoo/reports') ||
-    to.path.startsWith('/consolidation')
+    to.path.startsWith('/consolidation') ||
+    to.path.startsWith('/help')
 
   if (to.path === '/') {
     return authStore.isAuthenticated ? '/odoo/reports/kan-jabung' : '/odoo/login'

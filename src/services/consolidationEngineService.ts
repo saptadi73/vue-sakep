@@ -316,11 +316,19 @@ const inferSuggestedKey = (
   }
 }
 
-const inferSuggestedSign = (section: ConsolidationSection, account: string, description: string): 1 | -1 => {
+const inferSuggestedSign = (
+  section: ConsolidationSection,
+  account: string,
+  description: string,
+): 1 | -1 => {
   const desc = description.toLowerCase()
 
   if (section === 'pnl') {
-    if (/beban|biaya|expense|pokok|hpp|cogs/.test(desc) || account.startsWith('5') || account.startsWith('6')) {
+    if (
+      /beban|biaya|expense|pokok|hpp|cogs/.test(desc) ||
+      account.startsWith('5') ||
+      account.startsWith('6')
+    ) {
       return -1
     }
 
@@ -339,7 +347,9 @@ const buildMappingSuggestions = (
   const nodeByKey = new Map(sectionNodes.map((node) => [node.key, node]))
   const availableKeys = new Set<string>([
     ...sectionNodes.map((node) => node.key),
-    ...config.coaMappings.filter((mapping) => mapping.section === section).map((mapping) => mapping.consolidationKey),
+    ...config.coaMappings
+      .filter((mapping) => mapping.section === section)
+      .map((mapping) => mapping.consolidationKey),
   ])
 
   const suggestions: ConsolidationMappingSuggestion[] = []
