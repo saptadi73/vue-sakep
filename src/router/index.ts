@@ -12,6 +12,8 @@ import PtUspsKanjabungPnlView from '@/views/ptUspsKanjabung/PtUspsKanjabungPnlVi
 import PtUspsKanjabungTrialBalanceView from '@/views/ptUspsKanjabung/PtUspsKanjabungTrialBalanceView.vue'
 import OdooLoginView from '@/views/odoo/OdooLoginView.vue'
 import OdooFinanceReportsView from '@/views/odoo/OdooFinanceReportsView.vue'
+import ConsolidationConfigView from '@/views/consolidation/ConsolidationConfigView.vue'
+import ConsolidationPreviewView from '@/views/consolidation/ConsolidationPreviewView.vue'
 import { useOdooAuthStore } from '@/stores/odooAuth'
 
 const router = createRouter({
@@ -88,12 +90,27 @@ const router = createRouter({
       component: OdooFinanceReportsView,
       meta: { requiresAuth: true },
     },
+    {
+      path: '/consolidation/config',
+      name: 'consolidation-config',
+      component: ConsolidationConfigView,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/consolidation/preview',
+      name: 'consolidation-preview',
+      component: ConsolidationPreviewView,
+      meta: { requiresAuth: true },
+    },
   ],
 })
 
 router.beforeEach((to) => {
   const authStore = useOdooAuthStore()
-  const isDashboardRoute = to.path.startsWith('/reports') || to.path.startsWith('/odoo/reports')
+  const isDashboardRoute =
+    to.path.startsWith('/reports') ||
+    to.path.startsWith('/odoo/reports') ||
+    to.path.startsWith('/consolidation')
 
   if (to.path === '/') {
     return authStore.isAuthenticated ? '/odoo/reports/kan-jabung' : '/odoo/login'

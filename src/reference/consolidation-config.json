@@ -1,0 +1,127 @@
+{
+  "version": "1.0.0",
+  "groupCurrency": "IDR",
+  "entities": [
+    {
+      "id": "pt-jar",
+      "name": "PT. JAB Mart",
+      "source": "jabmart",
+      "enabled": true,
+      "ownershipPct": 100
+    },
+    {
+      "id": "pt-bprs",
+      "name": "PT. BPRS",
+      "source": "bprs",
+      "enabled": true,
+      "ownershipPct": 100
+    },
+    {
+      "id": "pt-uspps-kanjabung",
+      "name": "USPPS PT. Kanjabung",
+      "source": "uspps",
+      "enabled": true,
+      "ownershipPct": 100
+    }
+  ],
+  "coaMappings": [
+    {
+      "entityId": "pt-jar",
+      "sourceAccount": "4*",
+      "consolidationKey": "rev_external",
+      "section": "pnl",
+      "parentKey": "revenue",
+      "lineType": "detail",
+      "sign": 1,
+      "note": "Pendapatan usaha dari pihak eksternal"
+    },
+    {
+      "entityId": "pt-bprs",
+      "sourceAccount": "5*",
+      "consolidationKey": "cogs",
+      "section": "pnl",
+      "parentKey": "cost_of_sales",
+      "lineType": "detail",
+      "sign": -1,
+      "note": "Beban pokok penjualan"
+    },
+    {
+      "entityId": "pt-uspps-kanjabung",
+      "sourceAccount": "11*",
+      "consolidationKey": "cash_and_bank",
+      "section": "balance-sheet",
+      "parentKey": "current_assets",
+      "lineType": "detail",
+      "sign": 1
+    }
+  ],
+  "reportTree": [
+    {
+      "key": "revenue",
+      "section": "pnl",
+      "label": "Pendapatan Usaha",
+      "lineType": "header",
+      "order": 10
+    },
+    {
+      "key": "rev_external",
+      "section": "pnl",
+      "label": "Penjualan dan Pendapatan",
+      "lineType": "detail",
+      "parentKey": "revenue",
+      "order": 11
+    },
+    {
+      "key": "cost_of_sales",
+      "section": "pnl",
+      "label": "Beban Pokok Penjualan",
+      "lineType": "header",
+      "order": 20
+    },
+    {
+      "key": "cogs",
+      "section": "pnl",
+      "label": "Beban Pokok Penjualan",
+      "lineType": "detail",
+      "parentKey": "cost_of_sales",
+      "order": 21
+    },
+    {
+      "key": "gross_profit",
+      "section": "pnl",
+      "label": "Laba Kotor",
+      "lineType": "derived",
+      "order": 30,
+      "formula": "revenue + cost_of_sales"
+    },
+    {
+      "key": "current_assets",
+      "section": "balance-sheet",
+      "label": "Aset Lancar",
+      "lineType": "header",
+      "order": 110
+    },
+    {
+      "key": "cash_and_bank",
+      "section": "balance-sheet",
+      "label": "Kas dan Bank",
+      "lineType": "detail",
+      "parentKey": "current_assets",
+      "order": 111
+    }
+  ],
+  "eliminationRules": [
+    {
+      "id": "elim-ic-sales-cogs",
+      "name": "Eliminasi Penjualan Antar Entitas",
+      "enabled": true,
+      "section": "pnl",
+      "debitKey": "rev_external",
+      "creditKey": "cogs",
+      "scope": "all",
+      "method": "percentage",
+      "percentage": 100,
+      "note": "Gunakan khusus transaksi intercompany yang sudah ditag"
+    }
+  ]
+}

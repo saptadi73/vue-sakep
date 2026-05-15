@@ -74,6 +74,19 @@ const companyMenus = [
   },
 ]
 
+const consolidationMenus = [
+  {
+    to: '/consolidation/config',
+    label: 'Config Aggregasi & Eliminasi',
+    key: 'consolidation-config',
+  },
+  {
+    to: '/consolidation/preview',
+    label: 'Preview Agregasi & Eliminasi',
+    key: 'consolidation-preview',
+  },
+]
+
 const isActive = (path: string) => route.path === path
 const isLoginRoute = computed(() => route.path === '/odoo/login')
 
@@ -158,6 +171,19 @@ const logoutOdoo = async () => {
           >
             Logout Session Odoo
           </button>
+        </section>
+
+        <section class="company-block consolidation-block">
+          <p class="company-title">Konsolidasi</p>
+          <RouterLink
+            v-for="link in consolidationMenus"
+            :key="link.key"
+            :to="link.to"
+            class="menu-link"
+            :class="{ active: isActive(link.to) }"
+          >
+            {{ link.label }}
+          </RouterLink>
         </section>
       </nav>
     </aside>
@@ -254,6 +280,11 @@ h1 {
 .odoo-block {
   border-color: rgba(129, 214, 196, 0.45);
   background: linear-gradient(180deg, rgba(35, 105, 143, 0.24), rgba(34, 141, 108, 0.25));
+}
+
+.consolidation-block {
+  border-color: rgba(243, 177, 112, 0.52);
+  background: linear-gradient(180deg, rgba(131, 73, 20, 0.34), rgba(189, 114, 48, 0.2));
 }
 
 .menu-link {

@@ -68,6 +68,55 @@ const toAmountString = (value: number | undefined | null) => {
   return decimalFormatter.format(value)
 }
 
+const asRecord = (value: unknown): Record<string, unknown> | null => {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  return value as Record<string, unknown>
+}
+
+const parseRpcPayload = <T>(payload: unknown): T => {
+  const root = asRecord(payload)
+
+  if (!root) {
+    throw new Error('Response API Odoo tidak valid: payload bukan objek JSON.')
+  }
+
+  // Odoo native JSON-RPC responses are wrapped under `result`.
+  const candidate = asRecord(root.result) ?? root
+
+  if (candidate.status === 'error') {
+    throw new Error(
+      typeof candidate.message === 'string' && candidate.message.trim() !== ''
+        ? candidate.message
+        : 'Request gagal',
+    )
+  }
+
+  if (candidate.status === 'success') {
+    return (candidate.data ?? candidate.result) as T
+  }
+
+  // Handle plain Odoo JSON-RPC errors: { error: { data: { message } } }.
+  const rpcError = asRecord(root.error)
+  if (rpcError) {
+    const errorData = asRecord(rpcError.data)
+    const message =
+      (typeof errorData?.message === 'string' && errorData.message) ||
+      (typeof rpcError.message === 'string' && rpcError.message) ||
+      'Request gagal'
+    throw new Error(message)
+  }
+
+  // If backend returns direct data payload without status wrapper, accept it.
+  if (!('status' in candidate)) {
+    return candidate as T
+  }
+
+  throw new Error('Response API Odoo tidak dikenali.')
+}
+
 const postRpc = async <T, P extends object>(endpoint: string, params: P): Promise<T> => {
   const response = await fetch(buildUrl(endpoint), {
     method: 'POST',
@@ -83,12 +132,7 @@ const postRpc = async <T, P extends object>(endpoint: string, params: P): Promis
   }
 
   const json = (await response.json()) as OdooRpcResponse<T>
-
-  if (json.status === 'error') {
-    throw new Error(json.message || 'Request gagal')
-  }
-
-  return json.data
+  return parseRpcPayload<T>(json)
 }
 
 const toSafeNumber = (value: unknown): number | null => {

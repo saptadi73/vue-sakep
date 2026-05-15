@@ -15,15 +15,15 @@ Fokus dokumen ini:
 
 ## Ringkasan Endpoint
 
-| Endpoint | Method | Auth | Tujuan |
-|---|---|---|---|
-| `/api/accounting/authenticate` | `POST` | public | login dan membuat session Odoo |
-| `/api/accounting/companies` | `POST` | user | daftar company yang bisa diakses user |
-| `/api/accounting/reports/balance-sheet` | `POST` | user | laporan Balance Sheet |
-| `/api/accounting/reports/profit-loss` | `POST` | user | laporan Profit and Loss |
-| `/api/accounting/reports/trial-balance` | `POST` | user | laporan Trial Balance |
-| `/api/accounting/reports/general-ledger` | `POST` | user | laporan General Ledger summary dan detail |
-| `/api/accounting/journal-entry` | `POST` | user | detail journal entry dari GL |
+| Endpoint                                 | Method | Auth   | Tujuan                                    |
+| ---------------------------------------- | ------ | ------ | ----------------------------------------- |
+| `/api/accounting/authenticate`           | `POST` | public | login dan membuat session Odoo            |
+| `/api/accounting/companies`              | `POST` | user   | daftar company yang bisa diakses user     |
+| `/api/accounting/reports/balance-sheet`  | `POST` | user   | laporan Balance Sheet                     |
+| `/api/accounting/reports/profit-loss`    | `POST` | user   | laporan Profit and Loss                   |
+| `/api/accounting/reports/trial-balance`  | `POST` | user   | laporan Trial Balance                     |
+| `/api/accounting/reports/general-ledger` | `POST` | user   | laporan General Ledger summary dan detail |
+| `/api/accounting/journal-entry`          | `POST` | user   | detail journal entry dari GL              |
 
 ## Base URL
 
@@ -49,7 +49,7 @@ Flow:
 Untuk Vue.js yang berbeda domain, request harus memakai:
 
 ```js
-credentials: "include"
+credentials: 'include'
 ```
 
 Server juga perlu disiapkan untuk CORS dan cookie policy jika frontend beda domain.
@@ -94,11 +94,11 @@ Frontend perlu menyediakan halaman login sendiri sebelum user membuka dashboard 
 
 Field minimum pada halaman login:
 
-| Field | Type | Keterangan |
-|---|---:|---|
-| `login` | string | Email/username user Odoo. |
-| `password` | string | Password user Odoo. |
-| `db` | string | Nama database Odoo. Bisa dibuat hidden/default jika hanya memakai satu database. |
+| Field      |   Type | Keterangan                                                                       |
+| ---------- | -----: | -------------------------------------------------------------------------------- |
+| `login`    | string | Email/username user Odoo.                                                        |
+| `password` | string | Password user Odoo.                                                              |
+| `db`       | string | Nama database Odoo. Bisa dibuat hidden/default jika hanya memakai satu database. |
 
 Tombol login memanggil endpoint:
 
@@ -127,27 +127,46 @@ Jika response `status = "success"`, frontend dapat mengarahkan user ke halaman l
 - `company_name`
 - `company_ids`
 
+Data user juga tersedia di `user` untuk frontend yang memvalidasi objek user secara eksplisit:
+
+- `user.uid`
+- `user.name`
+- `user.login`
+- `user.company_id`
+- `user.company_name`
+- `user.company_ids`
+
 Session login utama tetap disimpan oleh browser sebagai cookie Odoo. Karena itu request berikutnya wajib memakai `credentials: "include"`.
 
 Contoh implementasi login:
 
 ```js
+function unwrapOdooJsonRpc(json) {
+  const payload = json.result || json
+
+  if (json.error) {
+    throw new Error(json.error.data?.message || json.error.message || 'Request gagal')
+  }
+
+  if (!payload || payload.status === 'error') {
+    throw new Error(payload?.message || 'Request gagal')
+  }
+
+  return payload.data
+}
+
 async function loginToOdoo({ login, password, db }) {
-  const response = await fetch("/api/accounting/authenticate", {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
+  const response = await fetch('/api/accounting/authenticate', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       params: { login, password, db },
     }),
   })
 
   const json = await response.json()
-  if (json.status === "error") {
-    throw new Error(json.message || "Login gagal")
-  }
-
-  return json.data
+  return unwrapOdooJsonRpc(json)
 }
 ```
 
@@ -156,7 +175,7 @@ Contoh alur di halaman login Vue:
 ```js
 async function submitLogin() {
   loading.value = true
-  errorMessage.value = ""
+  errorMessage.value = ''
 
   try {
     const user = await loginToOdoo({
@@ -166,7 +185,7 @@ async function submitLogin() {
     })
 
     authStore.setUser(user)
-    router.push("/finance/reports")
+    router.push('/finance/reports')
   } catch (error) {
     errorMessage.value = error.message
   } finally {
@@ -198,23 +217,141 @@ Gunakan format:
 
 Controller juga menerima payload langsung tanpa wrapper `params`, tetapi frontend disarankan selalu memakai `params` agar konsisten.
 
-Response sukses selalu memakai pola:
+Karena endpoint memakai route Odoo `type="json"`, response dari server biasanya dibungkus oleh JSON-RPC. Jadi response sukses aktual berbentuk:
 
 ```json
 {
-  "status": "success",
-  "data": {}
+  "jsonrpc": "2.0",
+  "id": null,
+  "result": {
+    "status": "success",
+    "data": {}
+  }
 }
 ```
 
-Response error:
+Response error dari method API berbentuk:
 
 ```json
 {
-  "status": "error",
-  "message": "Error message"
+  "jsonrpc": "2.0",
+  "id": null,
+  "result": {
+    "status": "error",
+    "message": "Error message"
+  }
 }
 ```
+
+Response error dari Odoo sendiri bisa berbentuk:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": null,
+  "error": {
+    "code": 200,
+    "message": "Odoo Server Error",
+    "data": {
+      "message": "Detail error"
+    }
+  }
+}
+```
+
+Frontend sebaiknya selalu melakukan unwrap response sebelum membaca field seperti `company_id`:
+
+```js
+function unwrapOdooJsonRpc(json) {
+  const payload = json.result || json
+
+  if (json.error) {
+    throw new Error(json.error.data?.message || json.error.message || 'Request gagal')
+  }
+
+  if (!payload || payload.status === 'error') {
+    throw new Error(payload?.message || 'Request gagal')
+  }
+
+  return payload.data
+}
+
+const json = await response.json()
+const data = unwrapOdooJsonRpc(json)
+const companyId = data.company_id
+```
+
+Jangan membaca `json.data.company_id` langsung jika request memakai JSON-RPC Odoo, karena `json.data` akan `undefined`. Field yang benar ada di `json.result.data.company_id` setelah unwrap.
+
+## Troubleshooting Selisih Angka Frontend vs Odoo
+
+Jika angka report di frontend berbeda dengan angka di layar report Odoo, hampir selalu penyebabnya adalah perbedaan parameter request atau konteks company/session.
+
+Parameter yang wajib sama persis antara frontend dan Odoo:
+
+- `company_id` atau `company_ids`
+- `date_from` dan `date_to`
+- `target_move` (`posted` vs `all`)
+- `display_accounts` (`all` vs `balance_not_zero`)
+- `strict_range`
+- `journal_ids`, `analytic_ids`, `analytic_tag_ids` (jika dipakai filter)
+
+Penyebab paling sering:
+
+1. Frontend mengirim `target_move: "posted"` tetapi Odoo UI memakai semua entry (`all`), atau sebaliknya.
+2. Company aktif di session Odoo berbeda dengan company yang dikirim frontend.
+3. Filter tambahan di Odoo UI aktif (journal/analytic/tag), tetapi tidak ikut dikirim dari frontend.
+4. `strict_range` berbeda, terutama untuk Balance Sheet (akun `from_the_beginning` dapat berubah signifikan).
+5. Frontend hanya menampilkan line tertentu (`display_accounts = balance_not_zero`) sementara Odoo UI menampilkan semua akun.
+
+Checklist verifikasi cepat:
+
+1. Ambil payload request dari Network tab frontend untuk endpoint report yang sama.
+2. Jalankan request yang sama ke endpoint API dan simpan response mentahnya.
+3. Bandingkan dengan report Odoo menggunakan company, periode, dan filter identik.
+4. Pastikan frontend melakukan unwrap JSON-RPC sebelum mapping angka.
+5. Untuk drill-down, pastikan payload dari `drilldown.payload` di-merge dengan filter report aktif (`company_ids`, `date_from`, `date_to`, `target_move`).
+
+Template payload pembanding (gunakan parameter yang sama dengan Odoo UI):
+
+```json
+{
+  "params": {
+    "company_ids": [1],
+    "date_from": "2026-01-01",
+    "date_to": "2026-12-31",
+    "target_move": "posted",
+    "display_accounts": "all",
+    "strict_range": true
+  }
+}
+```
+
+Template investigasi `Expected vs Actual`:
+
+| Parameter                    | Frontend (Network Payload) | Odoo UI (Filter Aktif) | Match? | Catatan                                                |
+| ---------------------------- | -------------------------- | ---------------------- | ------ | ------------------------------------------------------ |
+| `company_id` / `company_ids` |                            |                        |        |                                                        |
+| `date_from`                  |                            |                        |        |                                                        |
+| `date_to`                    |                            |                        |        |                                                        |
+| `target_move`                |                            |                        |        |                                                        |
+| `display_accounts`           |                            |                        |        |                                                        |
+| `strict_range`               |                            |                        |        |                                                        |
+| `journal_ids`                |                            |                        |        |                                                        |
+| `analytic_ids`               |                            |                        |        |                                                        |
+| `analytic_tag_ids`           |                            |                        |        |                                                        |
+| Endpoint report              |                            |                        |        | contoh: balance-sheet / trial-balance / general-ledger |
+
+Langkah pakai tabel:
+
+1. Isi kolom frontend dari request payload di browser Network tab.
+2. Isi kolom Odoo dari filter yang aktif saat report Odoo dibuka.
+3. Jika ada satu baris `Match? = No`, selesaikan baris itu dulu sebelum membandingkan angka lebih lanjut.
+
+Catatan implementasi frontend:
+
+- Simpan payload filter terakhir yang dipakai user, lalu gunakan payload yang sama untuk export/drill-down agar angka konsisten.
+- Gunakan `meta.company_name`, `meta.date_from`, `meta.date_to`, dan parameter filter sebagai header report agar user mudah validasi konteks data.
 
 ## Login
 
@@ -236,17 +373,29 @@ Response error:
 
 ```json
 {
-  "status": "success",
-  "message": "Authentication successful",
-  "data": {
-    "uid": 12,
-    "session_id": "session-id",
-    "db": "kanjabung_MRP",
-    "login": "user@example.com",
-    "name": "Finance User",
-    "company_id": 1,
-    "company_name": "Company Utama",
-    "company_ids": [1, 2, 3]
+  "jsonrpc": "2.0",
+  "id": null,
+  "result": {
+    "status": "success",
+    "message": "Authentication successful",
+    "data": {
+      "uid": 12,
+      "session_id": "session-id",
+      "db": "kanjabung_MRP",
+      "login": "user@example.com",
+      "name": "Finance User",
+      "company_id": 1,
+      "company_name": "Company Utama",
+      "company_ids": [1, 2, 3],
+      "user": {
+        "uid": 12,
+        "login": "user@example.com",
+        "name": "Finance User",
+        "company_id": 1,
+        "company_name": "Company Utama",
+        "company_ids": [1, 2, 3]
+      }
+    }
   }
 }
 ```
@@ -269,16 +418,20 @@ Mengambil company yang boleh dipakai user untuk filter laporan.
 
 ```json
 {
-  "status": "success",
-  "data": {
-    "active_company_id": 1,
-    "companies": [
-      {
-        "id": 1,
-        "name": "Company Utama",
-        "currency_id": 12
-      }
-    ]
+  "jsonrpc": "2.0",
+  "id": null,
+  "result": {
+    "status": "success",
+    "data": {
+      "active_company_id": 1,
+      "companies": [
+        {
+          "id": 1,
+          "name": "Company Utama",
+          "currency_id": 12
+        }
+      ]
+    }
   }
 }
 ```
@@ -287,18 +440,19 @@ Mengambil company yang boleh dipakai user untuk filter laporan.
 
 Parameter ini dipakai oleh Balance Sheet, Profit and Loss, Trial Balance, dan General Ledger.
 
-| Field | Type | Wajib | Keterangan |
-|---|---:|---:|---|
-| `company_id` | integer | tidak | Satu company. Jika `company_ids` dikirim, field ini boleh tidak dikirim. |
-| `company_ids` | array integer | tidak | Multi-company. User harus punya akses ke semua company yang dikirim. |
-| `date_from` | string `YYYY-MM-DD` | disarankan | Tanggal awal. |
-| `date_to` | string `YYYY-MM-DD` | disarankan | Tanggal akhir. |
-| `date_range` | string | tidak | Alternatif jika tidak kirim tanggal manual, contoh `this_financial_year`. |
-| `financial_year` | string | tidak | Default API: `january_december`. |
-| `target_move` | string | tidak | `posted` atau `all`. |
-| `journal_ids` | array integer | tidak | Filter journal. |
-| `analytic_ids` | array integer | tidak | Filter analytic account. |
-| `analytic_tag_ids` | array integer | tidak | Filter analytic tag. |
+| Field              |                Type |      Wajib | Keterangan                                                                                                                                                                                |
+| ------------------ | ------------------: | ---------: | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `company_id`       |             integer |      tidak | Satu company. Jika `company_ids` dikirim, field ini boleh tidak dikirim.                                                                                                                  |
+| `company_ids`      |       array integer |      tidak | Multi-company. User harus punya akses ke semua company yang dikirim.                                                                                                                      |
+| `date_from`        | string `YYYY-MM-DD` | disarankan | Tanggal awal.                                                                                                                                                                             |
+| `date_to`          | string `YYYY-MM-DD` | disarankan | Tanggal akhir.                                                                                                                                                                            |
+| `date_range`       |              string |      tidak | Alternatif jika tidak kirim tanggal manual, contoh `this_financial_year`.                                                                                                                 |
+| `financial_year`   |              string |      tidak | Default API: `january_december`.                                                                                                                                                          |
+| `target_move`      |              string |      tidak | `posted` atau `all`.                                                                                                                                                                      |
+| `journal_ids`      |       array integer |      tidak | Filter journal.                                                                                                                                                                           |
+| `analytic_ids`     |       array integer |      tidak | Filter analytic account.                                                                                                                                                                  |
+| `analytic_tag_ids` |       array integer |      tidak | Filter analytic tag.                                                                                                                                                                      |
+| `strict_range`     |             boolean |      tidak | Untuk Balance Sheet/Profit and Loss default API `true`. Untuk Balance Sheet, nilai `true` diperlukan agar akun dengan range `from_the_beginning` dihitung akumulatif seperti report Odoo. |
 
 Jika `company_id` dan `company_ids` kosong, backend memakai active company session.
 
@@ -388,12 +542,12 @@ Payload dan response sama seperti Balance Sheet. Perbedaannya `meta.report_type 
 
 #### Parameter tambahan
 
-| Field | Type | Default | Keterangan |
-|---|---:|---:|---|
-| `account_ids` | array integer | kosong | Filter akun tertentu. |
-| `display_accounts` | string | `balance_not_zero` | Bisa `all` atau `balance_not_zero`. |
-| `show_hierarchy` | boolean | `false` | Menampilkan struktur hierarki kode akun. |
-| `strict_range` | boolean | `false` | Mengikuti opsi strict range report existing. |
+| Field              |          Type |            Default | Keterangan                                   |
+| ------------------ | ------------: | -----------------: | -------------------------------------------- |
+| `account_ids`      | array integer |             kosong | Filter akun tertentu.                        |
+| `display_accounts` |        string | `balance_not_zero` | Bisa `all` atau `balance_not_zero`.          |
+| `show_hierarchy`   |       boolean |            `false` | Menampilkan struktur hierarki kode akun.     |
+| `strict_range`     |       boolean |            `false` | Mengikuti opsi strict range report existing. |
 
 #### Request
 
@@ -452,18 +606,18 @@ Endpoint ini punya dua mode:
 
 #### Parameter tambahan
 
-| Field | Type | Default | Keterangan |
-|---|---:|---:|---|
-| `account_id` | integer | kosong | Akun yang dibuka detailnya. |
-| `account_ids` | array integer | kosong | Filter beberapa akun untuk summary. |
-| `account_tag_ids` | array integer | kosong | Filter account tag. |
-| `partner_ids` | array integer | kosong | Filter partner. |
-| `sort_accounts_by` | string | `date` | `date` atau `journal`. |
-| `display_accounts` | string | `balance_not_zero` | `all` atau `balance_not_zero`. |
-| `initial_balance` | boolean | `true` | Sertakan opening balance. |
-| `include_details` | boolean | `false` | Sertakan detail line dalam konteks report. |
-| `page` | integer | `1` | Halaman detail move line saat `account_id` dikirim. |
-| `limit` | integer | `200` | Maksimal `1000`. |
+| Field              |          Type |            Default | Keterangan                                          |
+| ------------------ | ------------: | -----------------: | --------------------------------------------------- |
+| `account_id`       |       integer |             kosong | Akun yang dibuka detailnya.                         |
+| `account_ids`      | array integer |             kosong | Filter beberapa akun untuk summary.                 |
+| `account_tag_ids`  | array integer |             kosong | Filter account tag.                                 |
+| `partner_ids`      | array integer |             kosong | Filter partner.                                     |
+| `sort_accounts_by` |        string |             `date` | `date` atau `journal`.                              |
+| `display_accounts` |        string | `balance_not_zero` | `all` atau `balance_not_zero`.                      |
+| `initial_balance`  |       boolean |             `true` | Sertakan opening balance.                           |
+| `include_details`  |       boolean |            `false` | Sertakan detail line dalam konteks report.          |
+| `page`             |       integer |                `1` | Halaman detail move line saat `account_id` dikirim. |
+| `limit`            |       integer |              `200` | Maksimal `1000`.                                    |
 
 ### GL Summary
 
@@ -643,13 +797,14 @@ async function openFinancialLine(line) {
   if (!line.drilldown) return
 
   const response = await fetch(line.drilldown.endpoint, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ params: line.drilldown.payload }),
   })
 
-  return response.json()
+  const json = await response.json()
+  return unwrapOdooJsonRpc(json)
 }
 ```
 
@@ -665,9 +820,9 @@ Contoh merge payload:
 ```js
 const activeFilters = {
   company_ids: [1],
-  date_from: "2026-01-01",
-  date_to: "2026-12-31",
-  target_move: "posted",
+  date_from: '2026-01-01',
+  date_to: '2026-12-31',
+  target_move: 'posted',
 }
 
 async function openGlAccount(account) {
@@ -679,13 +834,14 @@ async function openGlAccount(account) {
   }
 
   const response = await fetch(account.drilldown.endpoint, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ params: payload }),
   })
 
-  return response.json()
+  const json = await response.json()
+  return unwrapOdooJsonRpc(json)
 }
 ```
 
@@ -703,32 +859,44 @@ async function openJournal(line) {
   if (!line.journal_entry) return
 
   const response = await fetch(line.journal_entry.endpoint, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ params: line.journal_entry.payload }),
   })
 
-  return response.json()
+  const json = await response.json()
+  return unwrapOdooJsonRpc(json)
 }
 ```
 
 ## Contoh Helper JSON-RPC Vue
 
 ```js
+export function unwrapOdooJsonRpc(json) {
+  const payload = json.result || json
+
+  if (json.error) {
+    throw new Error(json.error.data?.message || json.error.message || 'Odoo API error')
+  }
+
+  if (!payload || payload.status === 'error') {
+    throw new Error(payload?.message || 'Odoo API error')
+  }
+
+  return payload.data
+}
+
 export async function odooJsonRpc(endpoint, params = {}) {
   const response = await fetch(endpoint, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ params }),
   })
 
   const json = await response.json()
-  if (json.status === "error") {
-    throw new Error(json.message || "Odoo API error")
-  }
-  return json.data
+  return unwrapOdooJsonRpc(json)
 }
 ```
 
