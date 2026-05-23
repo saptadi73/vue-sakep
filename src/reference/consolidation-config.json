@@ -22,6 +22,20 @@
       "source": "uspps",
       "enabled": true,
       "ownershipPct": 100
+    },
+    {
+      "id": "kan-jabung",
+      "name": "KAN JABUNG",
+      "source": "odoo",
+      "enabled": true,
+      "ownershipPct": 100
+    },
+    {
+      "id": "pt-jgi",
+      "name": "PT. JGI",
+      "source": "odoo",
+      "enabled": true,
+      "ownershipPct": 100
     }
   ],
   "coaMappings": [
@@ -46,6 +60,16 @@
       "note": "Beban pokok penjualan"
     },
     {
+      "entityId": "pt-bprs",
+      "sourceAccount": "6*",
+      "consolidationKey": "op_expenses",
+      "section": "pnl",
+      "parentKey": "operating_expenses",
+      "lineType": "detail",
+      "sign": -1,
+      "note": "Beban operasional"
+    },
+    {
       "entityId": "pt-uspps-kanjabung",
       "sourceAccount": "11*",
       "consolidationKey": "cash_and_bank",
@@ -53,6 +77,146 @@
       "parentKey": "current_assets",
       "lineType": "detail",
       "sign": 1
+    },
+    {
+      "entityId": "kan-jabung",
+      "sourceAccount": "4*",
+      "consolidationKey": "rev_external",
+      "section": "pnl",
+      "parentKey": "revenue",
+      "lineType": "detail",
+      "sign": 1,
+      "note": "Starter mapping Odoo KAN JABUNG untuk akun pendapatan"
+    },
+    {
+      "entityId": "kan-jabung",
+      "sourceAccount": "5*",
+      "consolidationKey": "cogs",
+      "section": "pnl",
+      "parentKey": "cost_of_sales",
+      "lineType": "detail",
+      "sign": -1,
+      "note": "Starter mapping Odoo KAN JABUNG untuk akun beban"
+    },
+    {
+      "entityId": "kan-jabung",
+      "sourceAccount": "6*",
+      "consolidationKey": "op_expenses",
+      "section": "pnl",
+      "parentKey": "operating_expenses",
+      "lineType": "detail",
+      "sign": -1,
+      "note": "Starter mapping Odoo KAN JABUNG untuk beban operasional"
+    },
+    {
+      "entityId": "kan-jabung",
+      "sourceAccount": "11*",
+      "consolidationKey": "cash_and_bank",
+      "section": "balance-sheet",
+      "parentKey": "current_assets",
+      "lineType": "detail",
+      "sign": 1,
+      "note": "Starter mapping Odoo KAN JABUNG untuk kas/bank"
+    },
+    {
+      "entityId": "kan-jabung",
+      "sourceAccount": "4*",
+      "consolidationKey": "rev_external",
+      "section": "trial-balance",
+      "parentKey": "revenue",
+      "lineType": "detail",
+      "sign": 1,
+      "note": "Starter mapping trial balance Odoo KAN JABUNG"
+    },
+    {
+      "entityId": "kan-jabung",
+      "sourceAccount": "5*",
+      "consolidationKey": "cogs",
+      "section": "trial-balance",
+      "parentKey": "cost_of_sales",
+      "lineType": "detail",
+      "sign": -1,
+      "note": "Starter mapping trial balance Odoo KAN JABUNG"
+    },
+    {
+      "entityId": "kan-jabung",
+      "sourceAccount": "6*",
+      "consolidationKey": "op_expenses",
+      "section": "trial-balance",
+      "parentKey": "operating_expenses",
+      "lineType": "detail",
+      "sign": -1,
+      "note": "Starter mapping trial balance beban operasional Odoo KAN JABUNG"
+    },
+    {
+      "entityId": "pt-jgi",
+      "sourceAccount": "4*",
+      "consolidationKey": "rev_external",
+      "section": "pnl",
+      "parentKey": "revenue",
+      "lineType": "detail",
+      "sign": 1,
+      "note": "Starter mapping Odoo PT JGI untuk akun pendapatan"
+    },
+    {
+      "entityId": "pt-jgi",
+      "sourceAccount": "5*",
+      "consolidationKey": "cogs",
+      "section": "pnl",
+      "parentKey": "cost_of_sales",
+      "lineType": "detail",
+      "sign": -1,
+      "note": "Starter mapping Odoo PT JGI untuk akun beban"
+    },
+    {
+      "entityId": "pt-jgi",
+      "sourceAccount": "6*",
+      "consolidationKey": "op_expenses",
+      "section": "pnl",
+      "parentKey": "operating_expenses",
+      "lineType": "detail",
+      "sign": -1,
+      "note": "Starter mapping Odoo PT JGI untuk beban operasional"
+    },
+    {
+      "entityId": "pt-jgi",
+      "sourceAccount": "11*",
+      "consolidationKey": "cash_and_bank",
+      "section": "balance-sheet",
+      "parentKey": "current_assets",
+      "lineType": "detail",
+      "sign": 1,
+      "note": "Starter mapping Odoo PT JGI untuk kas/bank"
+    },
+    {
+      "entityId": "pt-jgi",
+      "sourceAccount": "4*",
+      "consolidationKey": "rev_external",
+      "section": "trial-balance",
+      "parentKey": "revenue",
+      "lineType": "detail",
+      "sign": 1,
+      "note": "Starter mapping trial balance Odoo PT JGI"
+    },
+    {
+      "entityId": "pt-jgi",
+      "sourceAccount": "5*",
+      "consolidationKey": "cogs",
+      "section": "trial-balance",
+      "parentKey": "cost_of_sales",
+      "lineType": "detail",
+      "sign": -1,
+      "note": "Starter mapping trial balance Odoo PT JGI"
+    },
+    {
+      "entityId": "pt-jgi",
+      "sourceAccount": "6*",
+      "consolidationKey": "op_expenses",
+      "section": "trial-balance",
+      "parentKey": "operating_expenses",
+      "lineType": "detail",
+      "sign": -1,
+      "note": "Starter mapping trial balance beban operasional Odoo PT JGI"
     }
   ],
   "reportTree": [
@@ -93,6 +257,29 @@
       "lineType": "derived",
       "order": 30,
       "formula": "revenue + cost_of_sales"
+    },
+    {
+      "key": "operating_expenses",
+      "section": "pnl",
+      "label": "Beban Operasional",
+      "lineType": "header",
+      "order": 40
+    },
+    {
+      "key": "op_expenses",
+      "section": "pnl",
+      "label": "Biaya Operasional",
+      "lineType": "detail",
+      "parentKey": "operating_expenses",
+      "order": 41
+    },
+    {
+      "key": "operating_profit",
+      "section": "pnl",
+      "label": "Laba Operasional",
+      "lineType": "derived",
+      "order": 50,
+      "formula": "gross_profit + operating_expenses"
     },
     {
       "key": "current_assets",

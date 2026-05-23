@@ -8,6 +8,7 @@ import {
   fetchOdooProfitLoss,
   fetchOdooTrialBalance,
 } from '@/services/odooService'
+import odooEntitiesConfigJson from '@/reference/odoo-entities-config.json'
 import { useOdooAuthStore } from '@/stores/odooAuth'
 import type { OdooCompany, OdooReportRequestParams } from '@/types/odoo'
 import type { ReportRow } from '@/types/report'
@@ -37,6 +38,48 @@ const filters = ref({
 
 const normalizeName = (value: string) => value.toLowerCase().replaceAll(/[\s._-]/g, '')
 
+interface OdooEntityConfig {
+  routeCode: CompanyRouteCode
+  displayName: string
+  roleLabel: string
+  nameKeywords: string[]
+}
+
+const odooEntitiesConfig = odooEntitiesConfigJson as { entities: OdooEntityConfig[] }
+
+const defaultEntityConfigs: OdooEntityConfig[] = [
+  {
+    routeCode: 'kan-jabung',
+    displayName: 'KAN JABUNG',
+    roleLabel: 'Company Utama',
+    nameKeywords: ['kan jabung', 'kanjabung'],
+  },
+  {
+    routeCode: 'pt-jgi',
+    displayName: 'PT. JGI',
+    roleLabel: 'Company Tambahan',
+    nameKeywords: ['pt jgi', 'pt. jgi', 'jgi'],
+  },
+]
+
+const defaultEntityConfigMap: Record<CompanyRouteCode, OdooEntityConfig> = {
+  'kan-jabung': defaultEntityConfigs[0] as OdooEntityConfig,
+  'pt-jgi': defaultEntityConfigs[1] as OdooEntityConfig,
+}
+
+const entityConfigs =
+  Array.isArray(odooEntitiesConfig.entities) && odooEntitiesConfig.entities.length > 0
+    ? odooEntitiesConfig.entities
+    : defaultEntityConfigs
+
+const findEntityConfig = (routeCode: CompanyRouteCode): OdooEntityConfig => {
+  return (
+    entityConfigs.find((entity) => entity.routeCode === routeCode) ??
+    defaultEntityConfigs.find((entity) => entity.routeCode === routeCode) ??
+    defaultEntityConfigMap[routeCode]
+  )
+}
+
 const findByKeywords = (companies: OdooCompany[], keywords: string[]) => {
   return companies.find((company) => {
     const normalizedName = normalizeName(company.name)
@@ -46,10 +89,13 @@ const findByKeywords = (companies: OdooCompany[], keywords: string[]) => {
 
 const mappedCompanies = computed(() => {
   const allCompanies = authStore.companies
-  const kanJabung = findByKeywords(allCompanies, ['kan jabung', 'kanjabung']) ?? allCompanies[0]
+  const kanJabungConfig = findEntityConfig('kan-jabung')
+  const ptJgiConfig = findEntityConfig('pt-jgi')
+
+  const kanJabung = findByKeywords(allCompanies, kanJabungConfig.nameKeywords) ?? allCompanies[0]
 
   const fallbackForPtJgi = allCompanies.find((company) => company.id !== kanJabung?.id)
-  const ptJgi = findByKeywords(allCompanies, ['pt jgi', 'pt. jgi', 'jgi']) ?? fallbackForPtJgi
+  const ptJgi = findByKeywords(allCompanies, ptJgiConfig.nameKeywords) ?? fallbackForPtJgi
 
   return {
     kanJabung,
@@ -71,7 +117,7 @@ const selectedCompany = computed(() => {
 })
 
 const companyRoleLabel = computed(() => {
-  return currentCompanyCode.value === 'kan-jabung' ? 'Company Utama' : 'Company Tambahan'
+  return findEntityConfig(currentCompanyCode.value).roleLabel
 })
 
 const companyWarning = computed(() => {
@@ -81,12 +127,14 @@ const companyWarning = computed(() => {
     return 'Company belum ditemukan dari response /api/accounting/companies.'
   }
 
-  if (currentCompanyCode.value === 'kan-jabung' && !/kan\s?jabung/i.test(company.name)) {
-    return 'Company utama belum terdeteksi sebagai KAN JABUNG. Periksa nama company di Odoo.'
-  }
+  const config = findEntityConfig(currentCompanyCode.value)
+  const normalizedCompanyName = normalizeName(company.name)
+  const isNameMatched = config.nameKeywords.some((keyword) =>
+    normalizedCompanyName.includes(normalizeName(keyword)),
+  )
 
-  if (currentCompanyCode.value === 'pt-jgi' && !/jgi/i.test(company.name)) {
-    return 'Company tambahan belum terdeteksi sebagai PT. JGI. Periksa nama company di Odoo.'
+  if (!isNameMatched) {
+    return `${config.roleLabel} belum terdeteksi sebagai ${config.displayName}. Periksa nama company di Odoo atau update src/reference/odoo-entities-config.json.`
   }
 
   return ''
@@ -174,8 +222,14 @@ onMounted(async () => {
     </header>
 
     <div class="company-switcher">
-      <RouterLink to="/odoo/reports/kan-jabung" class="switch-link">KAN JABUNG</RouterLink>
-      <RouterLink to="/odoo/reports/pt-jgi" class="switch-link">PT. JGI</RouterLink>
+      <RouterLink
+        v-for="entity in entityConfigs"
+        :key="entity.routeCode"
+        :to="`/odoo/reports/${entity.routeCode}`"
+        class="switch-link"
+      >
+        {{ entity.displayName }}
+      </RouterLink>
     </div>
 
     <form class="filters" @submit.prevent="loadReport">

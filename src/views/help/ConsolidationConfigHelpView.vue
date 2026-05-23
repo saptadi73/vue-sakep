@@ -17,7 +17,9 @@ import { RouterLink } from 'vue-router'
       <h2>Route Penting</h2>
       <div class="link-grid">
         <RouterLink to="/consolidation/config" class="link-pill">/consolidation/config</RouterLink>
-        <RouterLink to="/consolidation/preview" class="link-pill">/consolidation/preview</RouterLink>
+        <RouterLink to="/consolidation/preview" class="link-pill"
+          >/consolidation/preview</RouterLink
+        >
       </div>
     </section>
 

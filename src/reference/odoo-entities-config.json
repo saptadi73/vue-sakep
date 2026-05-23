@@ -1,0 +1,16 @@
+{
+  "entities": [
+    {
+      "routeCode": "kan-jabung",
+      "displayName": "KAN JABUNG",
+      "roleLabel": "Company Utama",
+      "nameKeywords": ["kan jabung", "kanjabung"]
+    },
+    {
+      "routeCode": "pt-jgi",
+      "displayName": "PT. JGI",
+      "roleLabel": "Company Tambahan",
+      "nameKeywords": ["pt jgi", "pt. jgi", "jgi"]
+    }
+  ]
+}

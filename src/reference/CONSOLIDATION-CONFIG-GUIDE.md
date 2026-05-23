@@ -29,14 +29,14 @@ Field utama:
 2. Atau akses route help: /help/consolidation-config.
 3. Buka menu Konsolidasi > Config Aggregasi & Eliminasi.
 4. Route: /consolidation/config.
-3. Pilih Mode Tabel untuk edit model baris-kolom seperti spreadsheet.
-4. Ubah nilai per sel pada tabel Entities, COA Mappings, Report Tree, dan Elimination Rules.
-5. Klik Simpan Config untuk validasi + simpan ke browser localStorage.
-6. Gunakan Export JSON untuk backup/commit, dan Import JSON untuk memuat file revisi.
-7. Buka menu Konsolidasi > Preview Agregasi & Eliminasi (route: /consolidation/preview).
-8. Pilih section report lalu klik Hitung Ulang Preview untuk melihat before/elimination/after.
-9. Cek Suggested Mapping Draft untuk akun yang belum termapping.
-10. Klik Tambahkan Suggestion ke Config untuk menambahkan draft mapping ke config aktif.
+5. Pilih Mode Tabel untuk edit model baris-kolom seperti spreadsheet.
+6. Ubah nilai per sel pada tabel Entities, COA Mappings, Report Tree, dan Elimination Rules.
+7. Klik Simpan Config untuk validasi + simpan ke browser localStorage.
+8. Gunakan Export JSON untuk backup/commit, dan Import JSON untuk memuat file revisi.
+9. Buka menu Konsolidasi > Preview Agregasi & Eliminasi (route: /consolidation/preview).
+10. Pilih section report lalu klik Hitung Ulang Preview untuk melihat before/elimination/after.
+11. Cek Suggested Mapping Draft untuk akun yang belum termapping.
+12. Klik Tambahkan Suggestion ke Config untuk menambahkan draft mapping ke config aktif.
 
 Catatan:
 

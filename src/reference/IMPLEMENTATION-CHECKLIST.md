@@ -184,7 +184,7 @@ POST http://36.92.125.247:33507/kirim/dashkan/get
 | **Endpoint**      | `/kirim/dashkan/get`                      | `/kirim/dashkan/get`                         |
 | **Device Header** | `Device-Terminal`                         | `Device-Terminal` ✅                         |
 | **Auth Header**   | `signature` in body                       | `Signature` in header ✅                     |
-| **User Field**    | `userid` in body                          | ❌ Not required                              |
+| **User Field**    | `userid` in body                          | ✅ `userid` in body (`System`)               |
 | **Reports**       | 4 (Balance Sheet, PnL, GL, Trial Balance) | 3 (Balance Sheet, PnL, Trial Balance)        |
 | **GL Drill-Down** | ✅ Ada                                    | ❌ Tidak Ada                                 |
 | **Timeout**       | 12s (report), 45s (GL)                    | 12s (all)                                    |

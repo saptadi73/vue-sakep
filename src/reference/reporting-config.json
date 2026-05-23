@@ -75,6 +75,7 @@
         },
         "body": {
           "request": "request_type",
+          "userid": "System",
           "signature": "VITE_KANJABUNG_SIGNATURE",
           "inptgljam": "YYYYMMDDHHMMSS"
         }

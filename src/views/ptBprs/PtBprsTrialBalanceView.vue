@@ -33,6 +33,7 @@ const source = ref<'live' | 'mock'>('mock')
 const sourceNote = ref('')
 const rows = ref<ReportRow[]>([])
 const lastUpdated = ref('')
+const debugInfo = ref<unknown>(null)
 
 const headerNote = computed(() => {
   if (source.value === 'live') {
@@ -68,6 +69,7 @@ const loadReport = async () => {
   rows.value = result.data
   source.value = result.source
   sourceNote.value = [autoFallbackNote, result.note ?? ''].filter(Boolean).join(' ')
+  debugInfo.value = result.debug || null
 
   if (result.source === 'live' && result.data.length > 0) {
     localStorage.setItem(LAST_SUCCESS_DATE_KEY, selectedDate.value)
@@ -145,6 +147,11 @@ const submitGlWizard = () => {
       empty-message="Data trial balance belum tersedia."
       @row-click="openGlWizard"
     />
+
+    <div v-if="debugInfo" class="debug-section">
+      <h3>Debug Info</h3>
+      <pre class="debug-output">{{ JSON.stringify(debugInfo, null, 2) }}</pre>
+    </div>
 
     <div v-if="wizardOpen" class="wizard-overlay" @click.self="closeGlWizard">
       <section class="wizard-panel">
@@ -262,6 +269,30 @@ const submitGlWizard = () => {
   font-size: 0.8rem;
   color: #8a9ab5;
   margin: 0;
+}
+
+.debug-section {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.debug-section h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #1a3354;
+}
+
+.debug-output {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: #f7f7fa;
+  padding: 1rem;
+  border-radius: 10px;
+  font-size: 0.92rem;
+  max-height: 400px;
+  overflow: auto;
 }
 
 .wizard-overlay {

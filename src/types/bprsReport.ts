@@ -36,6 +36,7 @@ export interface BprsReportResult {
   data: ReportRow[]
   source: 'live' | 'mock'
   note?: string
+  debug?: any
 }
 
 export interface BprsReportRequestParams {

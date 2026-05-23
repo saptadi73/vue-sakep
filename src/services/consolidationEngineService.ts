@@ -261,7 +261,12 @@ const inferSuggestedKey = (
     }
 
     if (/beban|biaya|expense/.test(desc) || acc.startsWith('5') || acc.startsWith('6')) {
-      const key = findFirstExistingKey(['cogs', 'cost_of_sales'], availableKeys)
+      const preferredExpenseKeys =
+        acc.startsWith('6') || /operasional|administrasi|umum|selling|marketing/.test(desc)
+          ? ['op_expenses', 'operating_expenses', 'cogs', 'cost_of_sales']
+          : ['cogs', 'cost_of_sales', 'op_expenses', 'operating_expenses']
+
+      const key = findFirstExistingKey(preferredExpenseKeys, availableKeys)
       return {
         key,
         confidence: key ? 'medium' : 'low',
@@ -300,8 +305,12 @@ const inferSuggestedKey = (
     }
 
     if (acc.startsWith('5') || acc.startsWith('6')) {
+      const preferredExpenseKeys = acc.startsWith('6')
+        ? ['op_expenses', 'operating_expenses', 'cogs', 'cost_of_sales']
+        : ['cogs', 'cost_of_sales', 'op_expenses', 'operating_expenses']
+
       return {
-        key: findFirstExistingKey(['cogs', 'cost_of_sales'], availableKeys),
+        key: findFirstExistingKey(preferredExpenseKeys, availableKeys),
         confidence: 'medium',
         reason: 'Prefix akun 5/6 pada trial balance diasumsikan beban.',
       }

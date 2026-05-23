@@ -40,6 +40,7 @@ VITE_KANJABUNG_SIGNATURE=6cb9051e5b3156d9816ba58b3dd4ca49
 ```json
 {
   "request": "GetNeracaHarian",
+  "userid": "System",
   "signature": "6cb9051e5b3156d9816ba58b3dd4ca49",
   "inptgljam": "20250313120530",
   "data01": {
@@ -60,6 +61,11 @@ VITE_KANJABUNG_SIGNATURE=6cb9051e5b3156d9816ba58b3dd4ca49
 - **unit**: Nomor unit/cabang (default: "00")
 - **tgl**: Tanggal dalam format YYYYMMDD
 - **inptgljam**: Timestamp dalam format YYYYMMDDHHmmss (dihasilkan otomatis)
+
+### Catatan Response
+
+- **GetNeracaHarian / GetNeracaPercobaan**: data detail umumnya ada di `dataNeraca`.
+- **GetLabaRugiHarian**: data detail umumnya ada di `dataRugiLaba` (sebagian integrasi lama bisa memakai `dataLabaRugi`).
 
 ## Struktur File Aplikasi
 
@@ -129,12 +135,49 @@ Berbeda dengan PT. BPRS yang memiliki fitur drill-down ke General Ledger, KANJAB
 
 ### Error Handling
 
-- Timeout: 12 detik untuk setiap request
+- Timeout: **30 detik** untuk setiap request (dinaikkan dari 12 detik)
+- **Retry otomatis 1x** saat timeout atau network error sebelum fallback
 - Fallback ke mock data jika:
-  - API tidak tersedia
+  - API tidak tersedia setelah retry
   - Kredensial belum diset
   - Response format tidak valid
   - Network error
+
+### ⚠️ CORS / Timeout di Production — Solusi Permanen
+
+Request langsung dari browser ke `api-uspps.kanjabung.com` bisa timeout karena CORS preflight tidak direspons dengan benar oleh server backend USPPS.
+
+**Solusi yang direkomendasikan**: Tambahkan reverse proxy di nginx `sakep.kanjabung.com` agar request USPPS diteruskan lewat server yang sama, seperti BPRS dan JAB Mart:
+
+```nginx
+# Tambahkan ke konfigurasi nginx sakep.kanjabung.com
+location /api/uspps-kanjabung/ {
+    proxy_pass https://api-uspps.kanjabung.com/;
+    proxy_set_header Host api-uspps.kanjabung.com;
+    proxy_set_header Content-Type application/json;
+    proxy_read_timeout 60s;
+    proxy_connect_timeout 10s;
+
+    # CORS agar browser tidak terblokir
+    add_header Access-Control-Allow-Origin $http_origin always;
+    add_header Access-Control-Allow-Methods "POST, OPTIONS" always;
+    add_header Access-Control-Allow-Headers "Content-Type, Device-Terminal, Signature" always;
+
+    if ($request_method = OPTIONS) {
+        return 204;
+    }
+}
+```
+
+Setelah nginx dikonfigurasi, update `.env.production`:
+
+```env
+# Sebelum (direct — rentan CORS/timeout):
+VITE_USPPS_KANJABUNG_API_BASE_URL=https://api-uspps.kanjabung.com
+
+# Sesudah (melalui proxy — sama dengan BPRS & JAB Mart):
+VITE_USPPS_KANJABUNG_API_BASE_URL=https://sakep.kanjabung.com/api/uspps-kanjabung
+```
 
 ## Diferensiasi dari PT. BPRS
 
@@ -146,7 +189,7 @@ Berbeda dengan PT. BPRS yang memiliki fitur drill-down ke General Ledger, KANJAB
 | Drill-Down GL | ✅ Ada                                    | ❌ Tidak Ada                              |
 | Reports       | 4 (Balance Sheet, PnL, GL, Trial Balance) | 3 (Balance Sheet, PnL, Trial Balance)     |
 | Request Body  | userid, signature, device                 | signature saja                            |
-| Timeout       | 12s (report), 45s (GL)                    | 12s                                       |
+| Timeout       | 12s (report), 45s (GL)                    | **30s + 1x retry**                        |
 
 ## Testing
 

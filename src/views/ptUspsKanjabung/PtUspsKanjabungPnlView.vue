@@ -27,6 +27,7 @@ const source = ref<'live' | 'mock'>('mock')
 const sourceNote = ref('')
 const rows = ref<ReportRow[]>([])
 const lastUpdated = ref('')
+const debugInfo = ref<unknown>(null)
 
 const headerNote = computed(() => {
   if (source.value === 'live') {
@@ -34,6 +35,12 @@ const headerNote = computed(() => {
   }
 
   return `Data contoh ditampilkan karena koneksi API gagal atau kredensial belum diset. ${sourceNote.value}`
+})
+
+const apiError = computed(() => {
+  if (source.value === 'live') return null
+  const dbg = debugInfo.value as Record<string, unknown> | null
+  return dbg?.error ? String(dbg.error) : null
 })
 
 const loadReport = async () => {
@@ -63,6 +70,7 @@ const loadReport = async () => {
   rows.value = result.data
   source.value = result.source
   sourceNote.value = [autoFallbackNote, result.note ?? ''].filter(Boolean).join(' ')
+  debugInfo.value = result.debug ?? null
 
   if (result.source === 'live' && result.data.length > 0) {
     localStorage.setItem(LAST_SUCCESS_DATE_KEY, selectedDate.value)
@@ -88,6 +96,10 @@ onMounted(loadReport)
       <p class="status-note">{{ headerNote }}</p>
     </header>
 
+    <div v-if="apiError" class="api-error-banner">
+      <strong>⚠ Koneksi ke API USPPS gagal:</strong> {{ apiError }}
+    </div>
+
     <form class="filters" @submit.prevent="loadReport">
       <label>
         Tanggal
@@ -111,6 +123,11 @@ onMounted(loadReport)
       :enable-drilldown="false"
       empty-message="Data laba rugi belum tersedia."
     />
+
+    <details v-if="debugInfo" class="debug-section">
+      <summary>Debug Info (klik untuk lihat detail)</summary>
+      <pre class="debug-output">{{ JSON.stringify(debugInfo, null, 2) }}</pre>
+    </details>
   </section>
 </template>
 
@@ -144,6 +161,18 @@ onMounted(loadReport)
   margin: 0.35rem 0 0;
   font-size: 0.88rem;
   color: #4b5f7f;
+}
+
+.api-error-banner {
+  background: #fff0f0;
+  border: 1px solid #f5c6c6;
+  border-left: 4px solid #c0392b;
+  border-radius: 10px;
+  padding: 0.75rem 1rem;
+  font-size: 0.88rem;
+  color: #7b1a1a;
+  line-height: 1.5;
+  word-break: break-word;
 }
 
 .filters {
@@ -190,5 +219,29 @@ onMounted(loadReport)
   margin: 0;
   font-size: 0.84rem;
   color: #5a6c89;
+}
+
+.debug-section {
+  display: grid;
+  gap: 0.5rem;
+  margin-top: 1rem;
+}
+
+.debug-section h3 {
+  margin: 0;
+  font-size: 1rem;
+  color: #1a3354;
+}
+
+.debug-output {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-all;
+  background: #f7f7fa;
+  padding: 1rem;
+  border-radius: 10px;
+  font-size: 0.92rem;
+  max-height: 400px;
+  overflow: auto;
 }
 </style>

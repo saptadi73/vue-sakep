@@ -12,6 +12,7 @@ import type {
   ConsolidationConfig,
   ConsolidationEntity,
   ConsolidationNode,
+  ConsolidationSection,
   EliminationRule,
 } from '@/types/consolidationConfig'
 
@@ -30,6 +31,34 @@ const summary = computed(() => {
     eliminationRules: current.eliminationRules.length,
   }
 })
+
+const entityIdOptions = computed(() => {
+  return config.value.entities.map((entity) => ({
+    id: entity.id,
+    label: `${entity.id} - ${entity.name}`,
+  }))
+})
+
+const eliminationKeyOptionsBySection = computed<Record<ConsolidationSection, string[]>>(() => {
+  const bySection: Record<ConsolidationSection, string[]> = {
+    pnl: [],
+    'balance-sheet': [],
+    'trial-balance': [],
+  }
+
+  for (const section of Object.keys(bySection) as ConsolidationSection[]) {
+    const keys = config.value.reportTree
+      .filter((node) => node.section === section)
+      .map((node) => node.key)
+    bySection[section] = Array.from(new Set(keys))
+  }
+
+  return bySection
+})
+
+const getEliminationKeyOptions = (section: ConsolidationSection): string[] => {
+  return eliminationKeyOptionsBySection.value[section] ?? []
+}
 
 const syncJsonFromConfig = () => {
   jsonText.value = JSON.stringify(config.value, null, 2)
@@ -234,7 +263,7 @@ const onMethodChanged = (rule: EliminationRule) => {
 
 const readEventValue = (event: Event): string => {
   const target = event.target
-  if (!target || !(target instanceof HTMLInputElement)) {
+  if (!target || !(target instanceof HTMLInputElement || target instanceof HTMLSelectElement)) {
     return ''
   }
 
@@ -287,8 +316,17 @@ const updateEntityPair = (row: EliminationRule, index: 0 | 1, event: Event) => {
   const value = readEventValue(event)
   const currentA = row.entityPair?.[0] ?? ''
   const currentB = row.entityPair?.[1] ?? ''
+  const nextA = index === 0 ? value : currentA
+  const nextB = index === 1 ? value : currentB
 
-  row.entityPair = index === 0 ? [value, currentB] : [currentA, value]
+  if (!nextA && !nextB) {
+    row.entityPair = undefined
+    row.scope = 'all'
+  } else {
+    row.entityPair = [nextA, nextB]
+    row.scope = 'entity-pair'
+  }
+
   markTableChanged()
 }
 
@@ -632,8 +670,48 @@ const updateEliminationNote = (row: EliminationRule, event: Event) => {
                       <option value="trial-balance">trial-balance</option>
                     </select>
                   </td>
-                  <td><input v-model="row.debitKey" type="text" @input="markTableChanged" /></td>
-                  <td><input v-model="row.creditKey" type="text" @input="markTableChanged" /></td>
+                  <td>
+                    <select v-model="row.debitKey" @change="markTableChanged">
+                      <option value="">-- pilih key --</option>
+                      <option
+                        v-for="key in getEliminationKeyOptions(row.section)"
+                        :key="`debit-${row.id}-${key}`"
+                        :value="key"
+                      >
+                        {{ key }}
+                      </option>
+                      <option
+                        v-if="
+                          row.debitKey &&
+                          !getEliminationKeyOptions(row.section).includes(row.debitKey)
+                        "
+                        :value="row.debitKey"
+                      >
+                        {{ row.debitKey }} (custom)
+                      </option>
+                    </select>
+                  </td>
+                  <td>
+                    <select v-model="row.creditKey" @change="markTableChanged">
+                      <option value="">-- pilih key --</option>
+                      <option
+                        v-for="key in getEliminationKeyOptions(row.section)"
+                        :key="`credit-${row.id}-${key}`"
+                        :value="key"
+                      >
+                        {{ key }}
+                      </option>
+                      <option
+                        v-if="
+                          row.creditKey &&
+                          !getEliminationKeyOptions(row.section).includes(row.creditKey)
+                        "
+                        :value="row.creditKey"
+                      >
+                        {{ row.creditKey }} (custom)
+                      </option>
+                    </select>
+                  </td>
                   <td>
                     <select v-model="row.scope" @change="onScopeChanged(row)">
                       <option value="all">all</option>
@@ -641,20 +719,34 @@ const updateEliminationNote = (row: EliminationRule, event: Event) => {
                     </select>
                   </td>
                   <td>
-                    <input
+                    <select
                       :value="row.entityPair?.[0] ?? ''"
-                      type="text"
-                      :disabled="row.scope !== 'entity-pair'"
-                      @input="updateEntityPair(row, 0, $event)"
-                    />
+                      @change="updateEntityPair(row, 0, $event)"
+                    >
+                      <option value="">-- pilih entitas --</option>
+                      <option
+                        v-for="entity in entityIdOptions"
+                        :key="`entity-a-${row.id}-${entity.id}`"
+                        :value="entity.id"
+                      >
+                        {{ entity.label }}
+                      </option>
+                    </select>
                   </td>
                   <td>
-                    <input
+                    <select
                       :value="row.entityPair?.[1] ?? ''"
-                      type="text"
-                      :disabled="row.scope !== 'entity-pair'"
-                      @input="updateEntityPair(row, 1, $event)"
-                    />
+                      @change="updateEntityPair(row, 1, $event)"
+                    >
+                      <option value="">-- pilih entitas --</option>
+                      <option
+                        v-for="entity in entityIdOptions"
+                        :key="`entity-b-${row.id}-${entity.id}`"
+                        :value="entity.id"
+                      >
+                        {{ entity.label }}
+                      </option>
+                    </select>
                   </td>
                   <td>
                     <select v-model="row.method" @change="onMethodChanged(row)">

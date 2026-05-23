@@ -11,6 +11,76 @@ export const getDefaultConsolidationConfig = (): ConsolidationConfig => {
   return cloneDefault()
 }
 
+const mergeMissingDefaultEntities = (config: ConsolidationConfig): ConsolidationConfig => {
+  const defaults = cloneDefault()
+  const existingEntityIds = new Set(config.entities.map((entity) => entity.id))
+
+  const missingDefaultEntities = defaults.entities.filter(
+    (entity) => !existingEntityIds.has(entity.id),
+  )
+  if (missingDefaultEntities.length === 0) {
+    return config
+  }
+
+  return {
+    ...config,
+    entities: [...config.entities, ...missingDefaultEntities],
+  }
+}
+
+const mappingIdentity = (entityId: string, section: string, sourceAccount: string) => {
+  return `${entityId}|${section}|${sourceAccount}`
+}
+
+const reportTreeIdentity = (section: string, key: string) => {
+  return `${section}|${key}`
+}
+
+const mergeMissingDefaultMappings = (config: ConsolidationConfig): ConsolidationConfig => {
+  const defaults = cloneDefault()
+  const existingMappingIds = new Set(
+    config.coaMappings.map((mapping) =>
+      mappingIdentity(mapping.entityId, mapping.section, mapping.sourceAccount),
+    ),
+  )
+
+  const missingDefaultMappings = defaults.coaMappings.filter(
+    (mapping) =>
+      !existingMappingIds.has(
+        mappingIdentity(mapping.entityId, mapping.section, mapping.sourceAccount),
+      ),
+  )
+
+  if (missingDefaultMappings.length === 0) {
+    return config
+  }
+
+  return {
+    ...config,
+    coaMappings: [...config.coaMappings, ...missingDefaultMappings],
+  }
+}
+
+const mergeMissingDefaultReportTree = (config: ConsolidationConfig): ConsolidationConfig => {
+  const defaults = cloneDefault()
+  const existingNodeIds = new Set(
+    config.reportTree.map((node) => reportTreeIdentity(node.section, node.key)),
+  )
+
+  const missingDefaultNodes = defaults.reportTree.filter(
+    (node) => !existingNodeIds.has(reportTreeIdentity(node.section, node.key)),
+  )
+
+  if (missingDefaultNodes.length === 0) {
+    return config
+  }
+
+  return {
+    ...config,
+    reportTree: [...config.reportTree, ...missingDefaultNodes],
+  }
+}
+
 const isObject = (value: unknown): value is Record<string, unknown> => {
   return !!value && typeof value === 'object' && !Array.isArray(value)
 }
@@ -73,7 +143,24 @@ export const readStoredConsolidationConfig = (): ConsolidationConfig | null => {
 }
 
 export const loadConsolidationConfig = (): ConsolidationConfig => {
-  return readStoredConsolidationConfig() ?? cloneDefault()
+  const stored = readStoredConsolidationConfig()
+  if (!stored) {
+    return cloneDefault()
+  }
+
+  const mergedEntities = mergeMissingDefaultEntities(stored)
+  const mergedMappings = mergeMissingDefaultMappings(mergedEntities)
+  const merged = mergeMissingDefaultReportTree(mergedMappings)
+
+  if (
+    merged.entities.length !== stored.entities.length ||
+    merged.coaMappings.length !== stored.coaMappings.length ||
+    merged.reportTree.length !== stored.reportTree.length
+  ) {
+    saveConsolidationConfig(merged)
+  }
+
+  return merged
 }
 
 export const saveConsolidationConfig = (config: ConsolidationConfig) => {

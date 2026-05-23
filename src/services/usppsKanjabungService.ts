@@ -5,7 +5,7 @@ import {
 } from '@/data/mockUspsKanjabungReports'
 import type { ReportRow } from '@/types/report'
 import type {
-  UspsKanjabungApiResponse,
+  UspsKanjabungReportDebugInfo,
   UspsKanjabungReportRequestParams,
   UspsKanjabungReportResult,
 } from '@/types/usppsKanjabungReport'
@@ -13,7 +13,8 @@ import type {
 const API_BASE_URL = import.meta.env.VITE_USPPS_KANJABUNG_API_BASE_URL ?? '/api/uspps-kanjabung'
 
 const ENDPOINT = `${API_BASE_URL}/kirim/dashkan/get`
-const REPORT_REQUEST_TIMEOUT_MS = 12000
+const REPORT_REQUEST_TIMEOUT_MS = 30000
+const MAX_RETRIES = 1
 
 const isRelativeApiBaseUrl = (value: string) => value.startsWith('/')
 const getProdApiConfigError = (): string | null => {
@@ -34,6 +35,7 @@ const getProdApiConfigError = (): string | null => {
 
 const DEFAULT_DEVICE_TERMINAL = import.meta.env.VITE_USPPS_KANJABUNG_DEVICE_TERMINAL ?? ''
 const DEFAULT_SIGNATURE = import.meta.env.VITE_USPPS_KANJABUNG_SIGNATURE ?? ''
+const DEFAULT_USER = import.meta.env.VITE_USPPS_KANJABUNG_USER ?? 'System'
 
 const buildTimestamp = (): string => {
   const now = new Date()
@@ -48,11 +50,16 @@ const buildTimestamp = (): string => {
   )
 }
 
-const createFallbackResult = (rows: ReportRow[], reason: string): UspsKanjabungReportResult => ({
+const createFallbackResult = (
+  rows: ReportRow[],
+  reason: string,
+  debug?: UspsKanjabungReportDebugInfo,
+): UspsKanjabungReportResult => ({
   header: { status: 'MOCK', message: 'Using fallback data' },
   data: rows,
   source: 'mock',
   note: reason,
+  debug,
 })
 
 const formatAmount = (value: unknown): string | null => {
@@ -156,7 +163,7 @@ const extractReportRows = (requestType: string, payload: Record<string, unknown>
   const candidateKeys =
     requestType === 'GetNeracaHarian' || requestType === 'GetNeracaPercobaan'
       ? ['data', 'dataNeraca', 'detail', 'result']
-      : ['data', 'dataLabaRugi', 'detail', 'result']
+      : ['data', 'dataRugiLaba', 'dataLabaRugi', 'detail', 'result']
 
   for (const key of candidateKeys) {
     const value = payload[key]
@@ -172,7 +179,7 @@ const hasReportArray = (requestType: string, payload: Record<string, unknown>) =
   const candidateKeys =
     requestType === 'GetNeracaHarian' || requestType === 'GetNeracaPercobaan'
       ? ['data', 'dataNeraca', 'detail', 'result']
-      : ['data', 'dataLabaRugi', 'detail', 'result']
+      : ['data', 'dataRugiLaba', 'dataLabaRugi', 'detail', 'result']
 
   return candidateKeys.some((key) => Array.isArray(payload[key]))
 }
@@ -192,25 +199,90 @@ const buildReportHeader = (payload: Record<string, unknown>) => {
   }
 }
 
+const attemptUspsKanjabungFetch = async (
+  requestType: string,
+  body: Record<string, unknown>,
+  debug: UspsKanjabungReportDebugInfo,
+  attempt: number,
+): Promise<
+  | { ok: true; payload: Record<string, unknown>; status: number }
+  | { ok: false; error: string; retryable: boolean }
+> => {
+  const controller = new AbortController()
+  const timeoutId = window.setTimeout(() => controller.abort(), REPORT_REQUEST_TIMEOUT_MS)
+
+  debug.requestAttempt = {
+    url: ENDPOINT,
+    method: 'POST',
+    corsMode: 'cors',
+    timestampStart: new Date().toISOString(),
+    ...(attempt > 0 ? { retryAttempt: attempt } : {}),
+  }
+
+  try {
+    const response = await fetch(ENDPOINT, {
+      method: 'POST',
+      headers: debug.requestHeaders,
+      body: JSON.stringify(body),
+      signal: controller.signal,
+      mode: 'cors',
+      credentials: 'omit',
+    })
+    window.clearTimeout(timeoutId)
+    debug.requestAttempt.timestampEnd = new Date().toISOString()
+    debug.responseStatus = response.status
+
+    const responseRaw = await response.text()
+    debug.responseRaw = responseRaw
+
+    let payload: Record<string, unknown> = {}
+    if (responseRaw.trim()) {
+      try {
+        payload = JSON.parse(responseRaw) as Record<string, unknown>
+      } catch {
+        return { ok: false, error: 'Respons bukan JSON yang valid', retryable: false }
+      }
+    }
+    debug.responseJson = payload
+
+    if (!response.ok) {
+      return { ok: false, error: `API returned status ${response.status}`, retryable: false }
+    }
+
+    return { ok: true, payload, status: response.status }
+  } catch (error) {
+    window.clearTimeout(timeoutId)
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      return {
+        ok: false,
+        error: `Request timeout setelah ${REPORT_REQUEST_TIMEOUT_MS / 1000} detik`,
+        retryable: true,
+      }
+    }
+    if (error instanceof TypeError) {
+      const msg = (error as Error).message
+      return {
+        ok: false,
+        error: `Network error: ${msg}. Kemungkinan CORS blocked atau server tidak accessible.`,
+        retryable: true,
+      }
+    }
+    return {
+      ok: false,
+      error: error instanceof Error ? error.message : 'Unknown error',
+      retryable: false,
+    }
+  }
+}
+
 const fetchUspsKanjabungReport = async (
   requestType: string,
   params: UspsKanjabungReportRequestParams,
   fallbackRows: ReportRow[],
 ): Promise<UspsKanjabungReportResult> => {
-  const apiConfigError = getProdApiConfigError()
-  if (apiConfigError) {
-    return createFallbackResult(fallbackRows, apiConfigError)
-  }
-
-  if (!DEFAULT_SIGNATURE || !DEFAULT_DEVICE_TERMINAL) {
-    return createFallbackResult(
-      fallbackRows,
-      'VITE_USPPS_KANJABUNG_SIGNATURE dan/atau VITE_USPPS_KANJABUNG_DEVICE_TERMINAL belum diset. Silakan tambahkan di file .env.local.',
-    )
-  }
-
   const body = {
     request: requestType,
+    userid: DEFAULT_USER,
     signature: DEFAULT_SIGNATURE,
     inptgljam: buildTimestamp(),
     data01: {
@@ -218,52 +290,66 @@ const fetchUspsKanjabungReport = async (
       tgl: params.tgl,
     },
   }
-
-  try {
-    const controller = new AbortController()
-    const timeoutId = window.setTimeout(() => controller.abort(), REPORT_REQUEST_TIMEOUT_MS)
-
-    const response = await fetch(ENDPOINT, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Device-Terminal': DEFAULT_DEVICE_TERMINAL,
-        Signature: DEFAULT_SIGNATURE,
-      },
-      body: JSON.stringify(body),
-      signal: controller.signal,
-    })
-    window.clearTimeout(timeoutId)
-
-    if (!response.ok) {
-      throw new Error(`API returned status ${response.status}`)
-    }
-
-    const payload = (await response.json()) as Record<string, unknown>
-    const header = buildReportHeader(payload)
-
-    if (!payload || !hasReportArray(requestType, payload)) {
-      throw new Error('Format respons API tidak valid')
-    }
-
-    const mappedRows = extractReportRows(requestType, payload)
-
-    return {
-      header,
-      data: mappedRows,
-      source: 'live',
-      note: mappedRows.length === 0 ? header.message || 'Data Tidak Ditemukan' : undefined,
-    }
-  } catch (error) {
-    const message =
-      error instanceof DOMException && error.name === 'AbortError'
-        ? `Request timeout setelah ${REPORT_REQUEST_TIMEOUT_MS / 1000} detik`
-        : error instanceof Error
-          ? error.message
-          : 'Unknown error saat memuat laporan USPPS-KANJABUNG'
-
-    return createFallbackResult(fallbackRows, message)
+  const debug: UspsKanjabungReportDebugInfo = {
+    endpoint: ENDPOINT,
+    requestHeaders: {
+      'Content-Type': 'application/json',
+      'Device-Terminal': DEFAULT_DEVICE_TERMINAL,
+      Signature: DEFAULT_SIGNATURE,
+    },
+    requestPayload: body,
+    clientTag: 'uspps-userid-fix-20260518',
   }
+
+  const apiConfigError = getProdApiConfigError()
+  if (apiConfigError) {
+    debug.error = apiConfigError
+    return createFallbackResult(fallbackRows, apiConfigError, debug)
+  }
+
+  if (!DEFAULT_SIGNATURE || !DEFAULT_DEVICE_TERMINAL) {
+    debug.error =
+      'VITE_USPPS_KANJABUNG_SIGNATURE dan/atau VITE_USPPS_KANJABUNG_DEVICE_TERMINAL belum diset. Request tidak dikirim ke API.'
+    return createFallbackResult(
+      fallbackRows,
+      'VITE_USPPS_KANJABUNG_SIGNATURE dan/atau VITE_USPPS_KANJABUNG_DEVICE_TERMINAL belum diset. Silakan tambahkan di file .env.local.',
+      debug,
+    )
+  }
+
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    const result = await attemptUspsKanjabungFetch(requestType, body, debug, attempt)
+
+    if (result.ok) {
+      const { payload } = result
+      const header = buildReportHeader(payload)
+
+      if (!payload || !hasReportArray(requestType, payload)) {
+        debug.error = 'Format respons API tidak valid'
+        return createFallbackResult(fallbackRows, 'Format respons API tidak valid', debug)
+      }
+
+      const mappedRows = extractReportRows(requestType, payload)
+      return {
+        header,
+        data: mappedRows,
+        source: 'live',
+        note: mappedRows.length === 0 ? header.message || 'Data Tidak Ditemukan' : undefined,
+        debug,
+      }
+    }
+
+    if (!result.retryable || attempt >= MAX_RETRIES) {
+      debug.error = result.error
+      debug.errorType = result.retryable ? 'RetryExhausted' : 'NonRetryable'
+      return createFallbackResult(fallbackRows, result.error, debug)
+    }
+
+    debug.error = `${result.error} — retrying (${attempt + 1}/${MAX_RETRIES})...`
+  }
+
+  debug.error = 'Semua percobaan gagal'
+  return createFallbackResult(fallbackRows, 'Semua percobaan gagal', debug)
 }
 
 export const fetchUspsKanjabungBalanceSheet = (

@@ -34,6 +34,7 @@ const getProdApiConfigError = (): string | null => {
 
 const DEFAULT_DEVICE_TERMINAL = import.meta.env.VITE_KANJABUNG_DEVICE_TERMINAL ?? ''
 const DEFAULT_SIGNATURE = import.meta.env.VITE_KANJABUNG_SIGNATURE ?? ''
+const DEFAULT_USER = import.meta.env.VITE_KANJABUNG_USER ?? 'System'
 
 const buildTimestamp = (): string => {
   const now = new Date()
@@ -156,7 +157,7 @@ const extractReportRows = (requestType: string, payload: Record<string, unknown>
   const candidateKeys =
     requestType === 'GetNeracaHarian' || requestType === 'GetNeracaPercobaan'
       ? ['data', 'dataNeraca', 'detail', 'result']
-      : ['data', 'dataLabaRugi', 'detail', 'result']
+      : ['data', 'dataRugiLaba', 'dataLabaRugi', 'detail', 'result']
 
   for (const key of candidateKeys) {
     const value = payload[key]
@@ -172,7 +173,7 @@ const hasReportArray = (requestType: string, payload: Record<string, unknown>) =
   const candidateKeys =
     requestType === 'GetNeracaHarian' || requestType === 'GetNeracaPercobaan'
       ? ['data', 'dataNeraca', 'detail', 'result']
-      : ['data', 'dataLabaRugi', 'detail', 'result']
+      : ['data', 'dataRugiLaba', 'dataLabaRugi', 'detail', 'result']
 
   return candidateKeys.some((key) => Array.isArray(payload[key]))
 }
@@ -211,6 +212,7 @@ const fetchKanjabungReport = async (
 
   const body = {
     request: requestType,
+    userid: DEFAULT_USER,
     signature: DEFAULT_SIGNATURE,
     inptgljam: buildTimestamp(),
     data01: {

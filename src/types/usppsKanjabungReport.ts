@@ -24,11 +24,31 @@ export interface UspsKanjabungApiResponse {
   data: ReportRow[]
 }
 
+export interface UspsKanjabungReportDebugInfo {
+  endpoint: string
+  requestHeaders: Record<string, string>
+  requestPayload: Record<string, unknown>
+  clientTag?: string
+  requestAttempt?: {
+    url: string
+    method: string
+    corsMode?: string
+    timestampStart?: string
+    timestampEnd?: string
+  }
+  responseStatus?: number
+  responseRaw?: string
+  responseJson?: unknown
+  error?: string
+  errorType?: string
+}
+
 export interface UspsKanjabungReportResult {
   header: UspsKanjabungResponseHeader
   data: ReportRow[]
   source: 'live' | 'mock'
   note?: string
+  debug?: UspsKanjabungReportDebugInfo
 }
 
 export interface UspsKanjabungReportRequestParams {

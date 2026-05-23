@@ -54,11 +54,16 @@ const buildTimestamp = (): string => {
   )
 }
 
-const createFallbackResult = (rows: ReportRow[], reason: string): BprsReportResult => ({
+const createFallbackResult = (
+  rows: ReportRow[],
+  reason: string,
+  debug?: any,
+): BprsReportResult => ({
   header: { status: 'MOCK', message: 'Using fallback data' },
   data: rows,
   source: 'mock',
   note: reason,
+  debug,
 })
 
 const formatAmount = (value: unknown): string | null => {
@@ -77,7 +82,40 @@ const formatAmount = (value: unknown): string | null => {
   }).format(numeric)
 }
 
-const toReportRows = (rows: unknown[]): ReportRow[] => {
+const mapTrialBalanceAmounts = (row: Record<string, unknown>) => {
+  const debit =
+    row.debet !== undefined
+      ? formatAmount(row.debet)
+      : row.debit !== undefined
+        ? formatAmount(row.debit)
+        : row.Amount !== undefined
+          ? formatAmount(row.Amount)
+          : null
+
+  const credit =
+    row.kredit !== undefined
+      ? formatAmount(row.kredit)
+      : row.credit !== undefined
+        ? formatAmount(row.credit)
+        : row.Amount1 !== undefined
+          ? formatAmount(row.Amount1)
+          : null
+
+  return {
+    Amount: debit,
+    Amount1: credit,
+  }
+}
+
+const mapSingleAmount = (row: Record<string, unknown>) =>
+  row.saldo !== undefined
+    ? formatAmount(row.saldo)
+    : row.Amount !== undefined
+      ? formatAmount(row.Amount)
+      : null
+
+const toReportRows = (requestType: string, rows: unknown[]): ReportRow[] => {
+  const isTrialBalanceRequest = requestType === 'GetNeracaPercobaan'
   const normalizedRows = rows.filter(
     (row): row is Record<string, unknown> => row !== null && typeof row === 'object',
   )
@@ -92,19 +130,15 @@ const toReportRows = (rows: unknown[]): ReportRow[] => {
       const description = String(
         row.nmsbb ?? row.nmbb ?? row.Description ?? row.section ?? '',
       ).trim()
-      const amount =
-        row.saldo !== undefined
-          ? formatAmount(row.saldo)
-          : row.Amount !== undefined
-            ? formatAmount(row.Amount)
-            : null
+      const trialBalanceAmounts = isTrialBalanceRequest ? mapTrialBalanceAmounts(row) : null
 
       const padLeft = account ? Math.max(0, Math.min(4, Math.floor((account.length - 1) / 2))) : 0
 
       return {
         Account: account,
         Description: description,
-        Amount: amount,
+        Amount: trialBalanceAmounts?.Amount ?? mapSingleAmount(row),
+        Amount1: trialBalanceAmounts?.Amount1,
         PadLeft: padLeft,
       }
     })
@@ -145,12 +179,8 @@ const toReportRows = (rows: unknown[]): ReportRow[] => {
     reportRows.push({
       Account: childAccount || parentAccount,
       Description: childDescription || parentDescription || section,
-      Amount:
-        row.saldo !== undefined
-          ? formatAmount(row.saldo)
-          : row.Amount !== undefined
-            ? formatAmount(row.Amount)
-            : null,
+      Amount: isTrialBalanceRequest ? mapTrialBalanceAmounts(row).Amount : mapSingleAmount(row),
+      Amount1: isTrialBalanceRequest ? mapTrialBalanceAmounts(row).Amount1 : null,
       PadLeft: 2,
     })
   }
@@ -162,12 +192,12 @@ const extractReportRows = (requestType: string, payload: Record<string, unknown>
   const candidateKeys =
     requestType === 'GetNeracaHarian' || requestType === 'GetNeracaPercobaan'
       ? ['data', 'dataNeraca', 'detail', 'result']
-      : ['data', 'dataLabaRugi', 'detail', 'result']
+      : ['data', 'dataRugiLaba', 'dataLabaRugi', 'detail', 'result']
 
   for (const key of candidateKeys) {
     const value = payload[key]
     if (Array.isArray(value)) {
-      return toReportRows(value)
+      return toReportRows(requestType, value)
     }
   }
 
@@ -178,7 +208,7 @@ const hasReportArray = (requestType: string, payload: Record<string, unknown>) =
   const candidateKeys =
     requestType === 'GetNeracaHarian' || requestType === 'GetNeracaPercobaan'
       ? ['data', 'dataNeraca', 'detail', 'result']
-      : ['data', 'dataLabaRugi', 'detail', 'result']
+      : ['data', 'dataRugiLaba', 'dataLabaRugi', 'detail', 'result']
 
   return candidateKeys.some((key) => Array.isArray(payload[key]))
 }
@@ -204,17 +234,6 @@ const fetchBprsReport = async (
   fallbackRows: ReportRow[],
 ): Promise<BprsReportResult> => {
   const apiConfigError = getProdApiConfigError()
-  if (apiConfigError) {
-    return createFallbackResult(fallbackRows, apiConfigError)
-  }
-
-  if (!DEFAULT_SIGNATURE) {
-    return createFallbackResult(
-      fallbackRows,
-      'VITE_BPRS_SIGNATURE belum diset. Silakan tambahkan di file .env.local.',
-    )
-  }
-
   const body = {
     request: requestType,
     userid: DEFAULT_USER,
@@ -225,6 +244,28 @@ const fetchBprsReport = async (
       tgl: params.tgl,
     },
   }
+  const debug: any = {
+    endpoint: ENDPOINT,
+    requestHeaders: {
+      'Content-Type': 'application/json',
+      'Device-Terminal': DEFAULT_DEVICE,
+    },
+    requestPayload: body,
+  }
+
+  if (apiConfigError) {
+    debug.error = apiConfigError
+    return createFallbackResult(fallbackRows, apiConfigError, debug)
+  }
+
+  if (!DEFAULT_SIGNATURE) {
+    debug.error = 'VITE_BPRS_SIGNATURE belum diset. Request tidak dikirim ke API.'
+    return createFallbackResult(
+      fallbackRows,
+      'VITE_BPRS_SIGNATURE belum diset. Silakan tambahkan di file .env.local.',
+      debug,
+    )
+  }
 
   try {
     const controller = new AbortController()
@@ -232,24 +273,37 @@ const fetchBprsReport = async (
 
     const response = await fetch(ENDPOINT, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Device-Terminal': DEFAULT_DEVICE,
-      },
+      headers: debug.requestHeaders,
       body: JSON.stringify(body),
       signal: controller.signal,
     })
     window.clearTimeout(timeoutId)
 
+    debug.responseStatus = response.status
+    const responseRaw = await response.text()
+    debug.responseRaw = responseRaw
+
+    let payload: Record<string, unknown> = {}
+    if (responseRaw.trim()) {
+      try {
+        payload = JSON.parse(responseRaw) as Record<string, unknown>
+      } catch {
+        debug.error = 'Respons bukan JSON yang valid'
+        return createFallbackResult(fallbackRows, 'Respons bukan JSON yang valid', debug)
+      }
+    }
+    debug.responseJson = payload
+
     if (!response.ok) {
-      throw new Error(`API returned status ${response.status}`)
+      debug.error = `API returned status ${response.status}`
+      return createFallbackResult(fallbackRows, `API returned status ${response.status}`, debug)
     }
 
-    const payload = (await response.json()) as Record<string, unknown>
     const header = buildReportHeader(payload)
 
     if (!payload || !hasReportArray(requestType, payload)) {
-      throw new Error('Format respons API tidak valid')
+      debug.error = 'Format respons API tidak valid'
+      return createFallbackResult(fallbackRows, 'Format respons API tidak valid', debug)
     }
 
     const mappedRows = extractReportRows(requestType, payload)
@@ -259,6 +313,7 @@ const fetchBprsReport = async (
       data: mappedRows,
       source: 'live',
       note: mappedRows.length === 0 ? header.message || 'Data Tidak Ditemukan' : undefined,
+      debug,
     }
   } catch (error) {
     const message =
@@ -267,8 +322,8 @@ const fetchBprsReport = async (
         : error instanceof Error
           ? error.message
           : 'Unknown error saat memuat laporan BPRS'
-
-    return createFallbackResult(fallbackRows, message)
+    debug.error = message
+    return createFallbackResult(fallbackRows, message, debug)
   }
 }
 

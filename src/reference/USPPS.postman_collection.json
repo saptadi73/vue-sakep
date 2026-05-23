@@ -1,0 +1,157 @@
+{
+  "info": {
+    "_postman_id": "e8008064-bccb-4ed5-bacf-01951ad4955a",
+    "name": "USPPS",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "4984647"
+  },
+  "item": [
+    {
+      "name": "USPPS NERACA",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Signature",
+            "value": "6cb9051e5b3156d9816ba58b3dd4ca49",
+            "type": "text"
+          },
+          {
+            "key": "Device-Terminal",
+            "value": "6cb9051e5b3156d9816ba58b3dd4ca49",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": " {\r\n    \"request\": \"GetNeracaHarian\",\r\n    \"signature\": \"6cb9051e5b3156d9816ba58b3dd4ca49\",\r\n    \"inptgljam\": \"20260518051703\",\r\n    \"data01\": {\r\n      \"unit\": \"00\",\r\n      \"tgl\": \"20250301\"\r\n    }\r\n }",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://36.92.125.247:33507/kirim/dashkan/get",
+          "protocol": "http",
+          "host": [
+            "36",
+            "92",
+            "125",
+            "247"
+          ],
+          "port": "33507",
+          "path": [
+            "kirim",
+            "dashkan",
+            "get"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "USPPS NERACA LBA RUGI",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Signature",
+            "value": "6cb9051e5b3156d9816ba58b3dd4ca49",
+            "type": "text"
+          },
+          {
+            "key": "Device-Terminal",
+            "value": "6cb9051e5b3156d9816ba58b3dd4ca49",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\r\n    \"request\": \"GetLabaRugiHarian\",\r\n    \"signature\": \"6cb9051e5b3156d9816ba58b3dd4ca49\",\r\n    \"userid\": \"System\",\r\n    \"inptgljam\": \"20260518052059\",\r\n    \"data01\": {\r\n      \"unit\": \"00\",\r\n      \"tgl\": \"20250301\"\r\n    }\r\n  }",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://36.92.125.247:33507/kirim/dashkan/get",
+          "protocol": "http",
+          "host": [
+            "36",
+            "92",
+            "125",
+            "247"
+          ],
+          "port": "33507",
+          "path": [
+            "kirim",
+            "dashkan",
+            "get"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "USPPS TRIAL BALANCE",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json",
+            "type": "text"
+          },
+          {
+            "key": "Signature",
+            "value": "6cb9051e5b3156d9816ba58b3dd4ca49",
+            "type": "text"
+          },
+          {
+            "key": "Device-Terminal",
+            "value": "6cb9051e5b3156d9816ba58b3dd4ca49",
+            "type": "text"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": " {\r\n    \"request\": \"GetNeracaHarian\",\r\n    \"signature\": \"6cb9051e5b3156d9816ba58b3dd4ca49\",\r\n    \"inptgljam\": \"20260518051703\",\r\n    \"data01\": {\r\n      \"unit\": \"00\",\r\n      \"tgl\": \"20250301\"\r\n    }\r\n }",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "http://36.92.125.247:33507/kirim/dashkan/get",
+          "protocol": "http",
+          "host": [
+            "36",
+            "92",
+            "125",
+            "247"
+          ],
+          "port": "33507",
+          "path": [
+            "kirim",
+            "dashkan",
+            "get"
+          ]
+        }
+      },
+      "response": []
+    }
+  ]
+}
