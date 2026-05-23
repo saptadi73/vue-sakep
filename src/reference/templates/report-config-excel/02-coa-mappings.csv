@@ -1,0 +1,7 @@
+entityId,sourceAccount,sourceDescriptionContains,consolidationKey,section,parentKey,lineType,sign,note
+pt-uspps-kanjabung,11*,,tb_cash,trial-balance,tb_assets,detail,1,Kas dan bank
+pt-uspps-kanjabung,12*,,tb_receivable,trial-balance,tb_assets,detail,1,Piutang
+pt-uspps-kanjabung,21*,,tb_ap,trial-balance,tb_liabilities,detail,-1,Utang usaha
+pt-uspps-kanjabung,31*,,tb_capital,trial-balance,tb_equity,detail,-1,Modal
+kan-jabung,11*,,tb_cash,trial-balance,tb_assets,detail,1,Kas dan bank (Odoo)
+kan-jabung,21*,,tb_ap,trial-balance,tb_liabilities,detail,-1,Utang usaha (Odoo)

@@ -1,0 +1,2 @@
+id,name,enabled,section,debitKey,creditKey,scope,entityPairLeft,entityPairRight,method,percentage,note
+elim-ap-ar-interco,Eliminasi AP/AR Antar Entitas,true,trial-balance,tb_receivable,tb_ap,all,,,percentage,100,Aktifkan jika transaksi antar entitas sudah diberi tag

@@ -85,6 +85,11 @@ const consolidationMenus = [
     label: 'Preview Agregasi & Eliminasi',
     key: 'consolidation-preview',
   },
+  {
+    to: '/consolidation/reports',
+    label: 'Laporan Keuangan Konsolidasi',
+    key: 'consolidation-reports',
+  },
 ]
 
 const helpMenus = [

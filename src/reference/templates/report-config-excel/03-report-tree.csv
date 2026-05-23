@@ -1,0 +1,13 @@
+key,section,label,lineType,parentKey,order,formula
+tb_assets,trial-balance,Aset,header,,10,
+tb_cash,trial-balance,Kas dan Bank,detail,tb_assets,11,
+tb_receivable,trial-balance,Piutang,detail,tb_assets,12,
+tb_assets_subtotal,trial-balance,Subtotal Aset,subtotal,tb_assets,13,
+tb_total_lex,trial-balance,Total Liabilitas dan Ekuitas,total,,20,
+tb_liabilities,trial-balance,Liabilitas,header,tb_total_lex,21,
+tb_ap,trial-balance,Utang Usaha,detail,tb_liabilities,22,
+tb_liabilities_subtotal,trial-balance,Subtotal Liabilitas,subtotal,tb_liabilities,23,
+tb_equity,trial-balance,Ekuitas,header,tb_total_lex,31,
+tb_capital,trial-balance,Modal,detail,tb_equity,32,
+tb_equity_subtotal,trial-balance,Subtotal Ekuitas,subtotal,tb_equity,33,
+tb_balance_check,trial-balance,Cek Selisih TB,derived,,50,tb_assets_subtotal - tb_total_lex

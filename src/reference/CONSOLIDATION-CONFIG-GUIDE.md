@@ -37,6 +37,12 @@ Field utama:
 10. Pilih section report lalu klik Hitung Ulang Preview untuk melihat before/elimination/after.
 11. Cek Suggested Mapping Draft untuk akun yang belum termapping.
 12. Klik Tambahkan Suggestion ke Config untuk menambahkan draft mapping ke config aktif.
+13. Setelah config dan preview valid, buka menu Konsolidasi > Laporan Keuangan Konsolidasi.
+14. Route: /consolidation/reports.
+15. Pilih periode (bulan dan tahun), klik Tampilkan Laporan.
+16. Navigasi antar tab Balance Sheet, Profit & Loss, dan Trial Balance.
+17. Gunakan tombol Export XLS untuk mengunduh ketiga laporan dalam satu file .xlsx (tiga sheet).
+18. Gunakan tombol Cetak untuk mencetak laporan aktif.
 
 Catatan:
 
@@ -62,8 +68,17 @@ Catatan:
 
 Dokumen ringkas untuk menu Help aplikasi juga tersedia di src/reference/CONSOLIDATION-CONFIG-HELP.md.
 
+## Export Laporan
+
+Halaman Laporan Keuangan Konsolidasi (/consolidation/reports) menyediakan:
+
+- Export XLS: file .xlsx dengan tiga sheet (Balance Sheet, Profit & Loss, Trial Balance).
+- Nama file: Laporan-Konsolidasi-<Bulan>-<Tahun>.xlsx
+- Cetak: hanya menampilkan tabel laporan aktif, wizard dan sidebar disembunyikan.
+
 ## Rekomendasi Governance
 
 - Satu perubahan mapping harus disertai contoh akun sumber dan expected hasil konsolidasi.
 - Lakukan review berpasangan untuk perubahan eliminationRules karena berdampak material.
 - Simpan snapshot config per periode pelaporan agar rekonsiliasi historis mudah.
+- Distribusikan file XLS hasil export ke stakeholder setelah dikonfirmasi di halaman Preview.

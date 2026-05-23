@@ -14,6 +14,7 @@ import OdooLoginView from '@/views/odoo/OdooLoginView.vue'
 import OdooFinanceReportsView from '@/views/odoo/OdooFinanceReportsView.vue'
 import ConsolidationConfigView from '@/views/consolidation/ConsolidationConfigView.vue'
 import ConsolidationPreviewView from '@/views/consolidation/ConsolidationPreviewView.vue'
+import ConsolidationReportsView from '@/views/consolidation/ConsolidationReportsView.vue'
 import ConsolidationConfigHelpView from '@/views/help/ConsolidationConfigHelpView.vue'
 import { useOdooAuthStore } from '@/stores/odooAuth'
 
@@ -101,6 +102,12 @@ const router = createRouter({
       path: '/consolidation/preview',
       name: 'consolidation-preview',
       component: ConsolidationPreviewView,
+      meta: { requiresAuth: true },
+    },
+    {
+      path: '/consolidation/reports',
+      name: 'consolidation-reports',
+      component: ConsolidationReportsView,
       meta: { requiresAuth: true },
     },
     {

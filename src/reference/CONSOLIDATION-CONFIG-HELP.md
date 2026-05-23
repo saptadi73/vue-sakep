@@ -36,8 +36,20 @@ Membantu user melakukan update config JSON konsolidasi dengan aman melalui UI ta
    - Top Unmapped Accounts
    - Suggested Mapping Draft
 
+## Melihat Laporan Keuangan Konsolidasi
+
+Setelah config valid dan preview dikonfirmasi:
+
+1. Buka menu **Konsolidasi > Laporan Keuangan Konsolidasi** atau route `/consolidation/reports`.
+2. Pilih **Bulan** dan **Tahun** pada wizard periode.
+3. Klik **Tampilkan Laporan**.
+4. Gunakan tab untuk berpindah antar **Balance Sheet**, **Profit & Loss**, dan **Trial Balance**.
+5. Klik **Export XLS** untuk mengunduh ketiga laporan dalam satu file Excel (3 sheet).
+6. Klik **Cetak** untuk mencetak laporan yang sedang aktif.
+
 ## Catatan Penting
 
 - Mode Tabel dan Mode JSON selalu sinkron pada draft yang sama.
-- Perubahan permanen hanya setelah klik **Simpan Config**.
+- Perubahan belum permanen sampai klik **Simpan Config**.
+- Untuk perubahan besar, selalu Export JSON sebagai snapshot sebelum update.
 - Simpan snapshot JSON setiap periode pelaporan untuk audit trail.

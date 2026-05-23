@@ -1,0 +1,192 @@
+{
+  "version": "1.0.0",
+  "groupCurrency": "IDR",
+  "entities": [
+    {
+      "id": "pt-uspps-kanjabung",
+      "name": "USPPS PT. Kanjabung",
+      "source": "uspps",
+      "enabled": true,
+      "ownershipPct": 100
+    },
+    {
+      "id": "kan-jabung",
+      "name": "KAN JABUNG",
+      "source": "odoo",
+      "enabled": true,
+      "ownershipPct": 100
+    }
+  ],
+  "coaMappings": [
+    {
+      "entityId": "pt-uspps-kanjabung",
+      "sourceAccount": "11*",
+      "consolidationKey": "tb_cash",
+      "section": "trial-balance",
+      "parentKey": "tb_assets",
+      "lineType": "detail",
+      "sign": 1,
+      "note": "Kas dan bank"
+    },
+    {
+      "entityId": "pt-uspps-kanjabung",
+      "sourceAccount": "12*",
+      "consolidationKey": "tb_receivable",
+      "section": "trial-balance",
+      "parentKey": "tb_assets",
+      "lineType": "detail",
+      "sign": 1,
+      "note": "Piutang"
+    },
+    {
+      "entityId": "pt-uspps-kanjabung",
+      "sourceAccount": "21*",
+      "consolidationKey": "tb_ap",
+      "section": "trial-balance",
+      "parentKey": "tb_liabilities",
+      "lineType": "detail",
+      "sign": -1,
+      "note": "Utang usaha"
+    },
+    {
+      "entityId": "pt-uspps-kanjabung",
+      "sourceAccount": "31*",
+      "consolidationKey": "tb_capital",
+      "section": "trial-balance",
+      "parentKey": "tb_equity",
+      "lineType": "detail",
+      "sign": -1,
+      "note": "Modal"
+    },
+    {
+      "entityId": "kan-jabung",
+      "sourceAccount": "11*",
+      "consolidationKey": "tb_cash",
+      "section": "trial-balance",
+      "parentKey": "tb_assets",
+      "lineType": "detail",
+      "sign": 1,
+      "note": "Kas dan bank (Odoo)"
+    },
+    {
+      "entityId": "kan-jabung",
+      "sourceAccount": "21*",
+      "consolidationKey": "tb_ap",
+      "section": "trial-balance",
+      "parentKey": "tb_liabilities",
+      "lineType": "detail",
+      "sign": -1,
+      "note": "Utang usaha (Odoo)"
+    }
+  ],
+  "reportTree": [
+    {
+      "key": "tb_assets",
+      "section": "trial-balance",
+      "label": "Aset",
+      "lineType": "header",
+      "order": 10
+    },
+    {
+      "key": "tb_cash",
+      "section": "trial-balance",
+      "label": "Kas dan Bank",
+      "lineType": "detail",
+      "parentKey": "tb_assets",
+      "order": 11
+    },
+    {
+      "key": "tb_receivable",
+      "section": "trial-balance",
+      "label": "Piutang",
+      "lineType": "detail",
+      "parentKey": "tb_assets",
+      "order": 12
+    },
+    {
+      "key": "tb_assets_subtotal",
+      "section": "trial-balance",
+      "label": "Subtotal Aset",
+      "lineType": "subtotal",
+      "parentKey": "tb_assets",
+      "order": 13
+    },
+    {
+      "key": "tb_total_lex",
+      "section": "trial-balance",
+      "label": "Total Liabilitas dan Ekuitas",
+      "lineType": "total",
+      "order": 20
+    },
+    {
+      "key": "tb_liabilities",
+      "section": "trial-balance",
+      "label": "Liabilitas",
+      "lineType": "header",
+      "parentKey": "tb_total_lex",
+      "order": 21
+    },
+    {
+      "key": "tb_ap",
+      "section": "trial-balance",
+      "label": "Utang Usaha",
+      "lineType": "detail",
+      "parentKey": "tb_liabilities",
+      "order": 22
+    },
+    {
+      "key": "tb_liabilities_subtotal",
+      "section": "trial-balance",
+      "label": "Subtotal Liabilitas",
+      "lineType": "subtotal",
+      "parentKey": "tb_liabilities",
+      "order": 23
+    },
+    {
+      "key": "tb_equity",
+      "section": "trial-balance",
+      "label": "Ekuitas",
+      "lineType": "header",
+      "parentKey": "tb_total_lex",
+      "order": 31
+    },
+    {
+      "key": "tb_capital",
+      "section": "trial-balance",
+      "label": "Modal",
+      "lineType": "detail",
+      "parentKey": "tb_equity",
+      "order": 32
+    },
+    {
+      "key": "tb_equity_subtotal",
+      "section": "trial-balance",
+      "label": "Subtotal Ekuitas",
+      "lineType": "subtotal",
+      "parentKey": "tb_equity",
+      "order": 33
+    },
+    {
+      "key": "tb_balance_check",
+      "section": "trial-balance",
+      "label": "Cek Selisih TB",
+      "lineType": "derived",
+      "order": 50,
+      "formula": "tb_assets_subtotal - tb_total_lex"
+    }
+  ],
+  "eliminationRules": [
+    {
+      "id": "elim-ap-ar-interco",
+      "name": "Eliminasi AP/AR Antar Entitas",
+      "enabled": true,
+      "section": "trial-balance",
+      "debitKey": "tb_receivable",
+      "creditKey": "tb_ap",
+      "scope": "all",
+      "method": "percentage",
+      "percentage": 100,
+      "note": "Aktifkan jika transaksi antar entitas sudah diberi tag"
+    }
+  ]
+}

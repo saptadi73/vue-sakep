@@ -20,6 +20,9 @@ import { RouterLink } from 'vue-router'
         <RouterLink to="/consolidation/preview" class="link-pill"
           >/consolidation/preview</RouterLink
         >
+        <RouterLink to="/consolidation/reports" class="link-pill"
+          >/consolidation/reports</RouterLink
+        >
       </div>
     </section>
 
@@ -33,6 +36,9 @@ import { RouterLink } from 'vue-router'
         <li>Gunakan Export JSON untuk backup atau commit ke repository.</li>
         <li>Jika ada file revisi dari tim lain, gunakan Import JSON.</li>
         <li>Buka halaman Preview, lalu klik Hitung Ulang Preview untuk validasi hasil.</li>
+        <li>Setelah preview dikonfirmasi, buka halaman Laporan Keuangan Konsolidasi.</li>
+        <li>Pilih periode (bulan dan tahun), klik Tampilkan Laporan.</li>
+        <li>Gunakan Export XLS untuk mengunduh laporan dalam format Excel.</li>
       </ol>
     </section>
 
@@ -57,12 +63,30 @@ import { RouterLink } from 'vue-router'
       </ul>
     </section>
 
+    <section class="card">
+      <h2>Laporan Keuangan Konsolidasi</h2>
+      <ol>
+        <li>
+          Buka menu Konsolidasi &gt; Laporan Keuangan Konsolidasi atau route /consolidation/reports.
+        </li>
+        <li>Pilih Bulan dan Tahun pada wizard periode.</li>
+        <li>Klik Tampilkan Laporan untuk menghitung ketiga laporan sekaligus.</li>
+        <li>
+          Gunakan tab untuk berpindah antar Balance Sheet, Profit &amp; Loss, dan Trial Balance.
+        </li>
+        <li>Klik Export XLS untuk mengunduh file Excel dengan tiga sheet (satu per laporan).</li>
+        <li>Klik Cetak untuk mencetak laporan yang sedang aktif.</li>
+      </ol>
+    </section>
+
     <section class="card warning">
       <h2>Catatan Penting</h2>
       <ul>
         <li>Mode Tabel dan Mode JSON memakai draft data yang sama dan selalu sinkron.</li>
         <li>Perubahan belum permanen sampai klik Simpan Config.</li>
         <li>Untuk perubahan besar, selalu Export JSON sebagai snapshot sebelum update.</li>
+        <li>Simpan snapshot JSON setiap periode pelaporan untuk audit trail.</li>
+        <li>Distribusikan file XLS hasil export setelah angka dikonfirmasi di halaman Preview.</li>
       </ul>
     </section>
   </section>
