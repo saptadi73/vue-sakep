@@ -1,11 +1,13 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { buildConsolidationPreview } from '@/services/consolidationEngineService'
 import {
+  getDefaultConsolidationConfig,
   loadConsolidationConfig,
+  loadConsolidationConfigFromFile,
   saveConsolidationConfig,
 } from '@/services/consolidationConfigService'
-import type { CoaMappingRule } from '@/types/consolidationConfig'
+import type { CoaMappingRule, ConsolidationConfig } from '@/types/consolidationConfig'
 import type { ConsolidationPreviewResult } from '@/types/consolidationResult'
 import type { ConsolidationSection } from '@/types/consolidationConfig'
 
@@ -16,8 +18,27 @@ const sectionOptions: Array<{ label: string; value: ConsolidationSection }> = [
 ]
 
 const selectedSection = ref<ConsolidationSection>('pnl')
-const result = ref<ConsolidationPreviewResult>(buildConsolidationPreview(selectedSection.value))
-const statusMessage = ref('Preview dihitung dari config aktif dan dataset report yang tersedia.')
+const activeConfig = ref<ConsolidationConfig>(getDefaultConsolidationConfig())
+const result = ref<ConsolidationPreviewResult>(
+  buildConsolidationPreview(selectedSection.value, activeConfig.value),
+)
+const statusMessage = ref('Memuat config aktif dari backend Odoo untuk preview.')
+const isLoading = ref(true)
+
+const loadActiveConfig = async () => {
+  isLoading.value = true
+
+  try {
+    const fromBackend = await loadConsolidationConfigFromFile()
+    activeConfig.value = fromBackend ?? loadConsolidationConfig()
+    result.value = buildConsolidationPreview(selectedSection.value, activeConfig.value)
+    statusMessage.value = fromBackend
+      ? 'Preview dihitung dari config backend Odoo yang aktif.'
+      : 'Backend Odoo tidak tersedia. Preview memakai template default.'
+  } finally {
+    isLoading.value = false
+  }
+}
 
 const formatMoney = (value: number) =>
   new Intl.NumberFormat('id-ID', {
@@ -26,8 +47,8 @@ const formatMoney = (value: number) =>
   }).format(value)
 
 const recalculate = () => {
-  result.value = buildConsolidationPreview(selectedSection.value)
-  statusMessage.value = 'Preview berhasil dihitung ulang menggunakan config terbaru.'
+  result.value = buildConsolidationPreview(selectedSection.value, activeConfig.value)
+  statusMessage.value = 'Preview berhasil dihitung ulang menggunakan config aktif terbaru.'
 }
 
 const totalBefore = computed(() =>
@@ -67,7 +88,7 @@ const copyDraftToClipboard = async () => {
 }
 
 const applySuggestionsToConfig = async () => {
-  const config = loadConsolidationConfig()
+  const config = JSON.parse(JSON.stringify(activeConfig.value)) as ConsolidationConfig
   const existingKeys = new Set(
     config.coaMappings.map(
       (m) => `${m.entityId}|${m.section}|${m.sourceAccount}|${m.consolidationKey}`,
@@ -93,12 +114,19 @@ const applySuggestionsToConfig = async () => {
   }
 
   const saveResult = await saveConsolidationConfig(config)
+  if (saveResult.mode === 'backend-and-storage') {
+    activeConfig.value = config
+  }
   recalculate()
   statusMessage.value =
     saveResult.mode === 'backend-and-storage'
       ? `${added} suggestion berhasil ditambahkan dan disimpan permanen ke backend Odoo. Cek /consolidation/config untuk review.`
-      : `${added} suggestion ditambahkan, tetapi saat ini hanya tersimpan di browser storage. ${saveResult.error ?? ''}`.trim()
+      : `${added} suggestion ditambahkan, tetapi backend Odoo gagal menyimpan perubahan. ${saveResult.error ?? ''}`.trim()
 }
+
+onMounted(async () => {
+  await loadActiveConfig()
+})
 </script>
 
 <template>
@@ -122,11 +150,17 @@ const applySuggestionsToConfig = async () => {
         </select>
       </label>
 
-      <button type="button" class="btn primary" @click="recalculate">Hitung Ulang Preview</button>
+      <button type="button" class="btn primary" :disabled="isLoading" @click="recalculate">
+        Hitung Ulang Preview
+      </button>
       <p class="status">{{ statusMessage }}</p>
     </section>
 
-    <section class="summary-grid">
+    <section v-if="isLoading" class="filter-card">
+      <p class="status">Memuat config aktif dari backend Odoo...</p>
+    </section>
+
+    <section v-else class="summary-grid">
       <article class="stat-card">
         <p class="stat-label">Total Before</p>
         <p class="stat-value">{{ formatMoney(totalBefore) }}</p>
@@ -145,7 +179,7 @@ const applySuggestionsToConfig = async () => {
       </article>
     </section>
 
-    <section class="table-card">
+    <section v-if="!isLoading" class="table-card">
       <h2>Line Result</h2>
       <div class="table-wrap">
         <table>
@@ -175,7 +209,7 @@ const applySuggestionsToConfig = async () => {
       </div>
     </section>
 
-    <section class="table-card">
+    <section v-if="!isLoading" class="table-card">
       <h2>Elimination Rules Applied</h2>
       <div class="table-wrap">
         <table>
@@ -202,7 +236,7 @@ const applySuggestionsToConfig = async () => {
       </div>
     </section>
 
-    <section class="table-card">
+    <section v-if="!isLoading" class="table-card">
       <h2>Source Summary</h2>
       <div class="table-wrap">
         <table>
@@ -228,7 +262,7 @@ const applySuggestionsToConfig = async () => {
       </div>
     </section>
 
-    <section class="table-card">
+    <section v-if="!isLoading" class="table-card">
       <h2>Top Unmapped Accounts (Sample)</h2>
       <div class="table-wrap">
         <table>
@@ -258,7 +292,7 @@ const applySuggestionsToConfig = async () => {
       </div>
     </section>
 
-    <section class="table-card">
+    <section v-if="!isLoading" class="table-card">
       <div class="table-head">
         <h2>Suggested Mapping Draft</h2>
         <div class="actions">

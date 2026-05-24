@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
 import {
   getDefaultConsolidationConfig,
   loadConsolidationConfig,
@@ -17,11 +17,35 @@ import type {
   EliminationRule,
 } from '@/types/consolidationConfig'
 
-const config = ref<ConsolidationConfig>(loadConsolidationConfig())
+const config = ref<ConsolidationConfig>(getDefaultConsolidationConfig())
 const jsonText = ref(JSON.stringify(config.value, null, 2))
-const statusMessage = ref('Config berhasil dimuat.')
+const statusMessage = ref('Memuat config dari backend Odoo...')
 const parseErrors = ref<string[]>([])
 const editorMode = ref<'table' | 'json'>('table')
+const isLoading = ref(true)
+const activeSourceLabel = ref('backend Odoo')
+const activeSourceTone = ref<'backend' | 'fallback' | 'template'>('backend')
+const toastMessage = ref('')
+const toastVisible = ref(false)
+let toastTimer: number | undefined
+
+const hideToast = () => {
+  toastVisible.value = false
+  toastMessage.value = ''
+}
+
+const showSuccessToast = (message: string) => {
+  if (toastTimer !== undefined) {
+    window.clearTimeout(toastTimer)
+  }
+
+  toastMessage.value = message
+  toastVisible.value = true
+  toastTimer = window.setTimeout(() => {
+    hideToast()
+    toastTimer = undefined
+  }, 3000)
+}
 
 const buildSaveStatusMessage = (
   result: Awaited<ReturnType<typeof saveConsolidationConfig>>,
@@ -34,8 +58,8 @@ const buildSaveStatusMessage = (
   }
 
   return tableMode
-    ? `Config tabel hanya tersimpan di browser storage. ${result.error ?? ''}`.trim()
-    : `Config hanya tersimpan di browser storage. ${result.error ?? ''}`.trim()
+    ? `Config tabel belum tersimpan permanen ke backend Odoo. ${result.error ?? ''}`.trim()
+    : `Config belum tersimpan permanen ke backend Odoo. ${result.error ?? ''}`.trim()
 }
 
 const summary = computed(() => {
@@ -109,6 +133,15 @@ const applyJsonText = async () => {
   const saveResult = await saveConsolidationConfig(config.value)
   syncJsonFromConfig()
   statusMessage.value = buildSaveStatusMessage(saveResult)
+
+  if (saveResult.mode === 'backend-and-storage') {
+    activeSourceLabel.value = 'backend Odoo (terkonfirmasi)'
+    activeSourceTone.value = 'backend'
+    showSuccessToast('Berhasil disimpan ke backend Odoo.')
+  } else {
+    activeSourceLabel.value = 'template default'
+    activeSourceTone.value = 'template'
+  }
 }
 
 const saveTableConfig = async () => {
@@ -123,6 +156,15 @@ const saveTableConfig = async () => {
   syncJsonFromConfig()
   parseErrors.value = []
   statusMessage.value = buildSaveStatusMessage(saveResult, true)
+
+  if (saveResult.mode === 'backend-and-storage') {
+    activeSourceLabel.value = 'backend Odoo (terkonfirmasi)'
+    activeSourceTone.value = 'backend'
+    showSuccessToast('Berhasil disimpan ke backend Odoo.')
+  } else {
+    activeSourceLabel.value = 'template default'
+    activeSourceTone.value = 'template'
+  }
 }
 
 const saveConfig = async () => {
@@ -134,20 +176,34 @@ const saveConfig = async () => {
   await saveTableConfig()
 }
 
+const loadBackendFirst = async () => {
+  isLoading.value = true
+
+  try {
+    const fromFile = await loadConsolidationConfigFromFile()
+    config.value = fromFile ?? loadConsolidationConfig()
+    syncJsonFromConfig()
+    parseErrors.value = []
+    activeSourceLabel.value = fromFile ? 'backend Odoo (terkonfirmasi)' : 'template default'
+    activeSourceTone.value = fromFile ? 'backend' : 'template'
+    statusMessage.value = fromFile
+      ? 'Config terbaru dimuat dari backend Odoo yang terkonfirmasi.'
+      : 'Backend Odoo tidak tersedia, config fallback ke template default.'
+  } finally {
+    isLoading.value = false
+  }
+}
+
 const reloadFromStorage = async () => {
-  const fromFile = await loadConsolidationConfigFromFile()
-  config.value = fromFile ?? loadConsolidationConfig()
-  syncJsonFromConfig()
-  parseErrors.value = []
-  statusMessage.value = fromFile
-    ? 'Config dimuat ulang dari backend Odoo.'
-    : 'Config dimuat ulang dari storage/default.'
+  await loadBackendFirst()
 }
 
 const resetToDefault = () => {
   config.value = resetConsolidationConfig()
   syncJsonFromConfig()
   parseErrors.value = []
+  activeSourceLabel.value = 'template default'
+  activeSourceTone.value = 'template'
   statusMessage.value = 'Config direset ke template default.'
 }
 
@@ -188,18 +244,19 @@ const loadTemplate = () => {
   config.value = template
   syncJsonFromConfig()
   parseErrors.value = []
+  activeSourceLabel.value = 'template default'
+  activeSourceTone.value = 'template'
   statusMessage.value = 'Template default dimuat. Klik Simpan Config untuk commit.'
 }
 
 onMounted(async () => {
-  const fromFile = await loadConsolidationConfigFromFile()
-  if (!fromFile) {
-    return
-  }
+  await loadBackendFirst()
+})
 
-  config.value = fromFile
-  syncJsonFromConfig()
-  statusMessage.value = 'Config berhasil dimuat dari backend Odoo.'
+onBeforeUnmount(() => {
+  if (toastTimer !== undefined) {
+    window.clearTimeout(toastTimer)
+  }
 })
 
 const addEntity = () => {
@@ -300,6 +357,12 @@ const readEventValue = (event: Event): string => {
   return target.value
 }
 
+const preventSelectTyping = (event: KeyboardEvent) => {
+  if (event.key.length === 1) {
+    event.preventDefault()
+  }
+}
+
 const updateOwnershipPct = (row: ConsolidationEntity, event: Event) => {
   const value = readEventValue(event)
   row.ownershipPct = value ? Number(value) : undefined
@@ -375,6 +438,12 @@ const updateEliminationNote = (row: EliminationRule, event: Event) => {
 
 <template>
   <section class="page-wrap">
+    <transition name="toast-fade">
+      <div v-if="toastVisible" class="toast toast-success" role="status" aria-live="polite">
+        {{ toastMessage }}
+      </div>
+    </transition>
+
     <header class="hero">
       <p class="eyebrow">Consolidation Setup</p>
       <h1>Config Aggregasi dan Eliminasi</h1>
@@ -384,443 +453,475 @@ const updateEliminationNote = (row: EliminationRule, event: Event) => {
       </p>
     </header>
 
-    <div class="summary-grid">
-      <article class="stat-card">
-        <p class="stat-label">Entitas Aktif</p>
-        <p class="stat-value">{{ summary.entities }}</p>
-      </article>
-      <article class="stat-card">
-        <p class="stat-label">COA Mapping</p>
-        <p class="stat-value">{{ summary.mappings }}</p>
-      </article>
-      <article class="stat-card">
-        <p class="stat-label">Node Report Tree</p>
-        <p class="stat-value">{{ summary.treeNodes }}</p>
-      </article>
-      <article class="stat-card">
-        <p class="stat-label">Rule Eliminasi</p>
-        <p class="stat-value">{{ summary.eliminationRules }}</p>
-      </article>
-    </div>
-
-    <section class="help-card">
-      <h2>Yang Perlu Anda Tambahkan</h2>
-      <ol>
-        <li>Lengkapi entities sesuai seluruh anak perusahaan yang masuk konsolidasi.</li>
-        <li>Isi coaMappings untuk setiap COA source ke consolidationKey target.</li>
-        <li>Bangun reportTree untuk struktur final laporan konsolidasi.</li>
-        <li>Definisikan eliminationRules untuk transaksi antar entitas (intercompany).</li>
-      </ol>
+    <section v-if="isLoading" class="loading-card" aria-live="polite">
+      <div class="loading-spinner" aria-hidden="true"></div>
+      <div>
+        <h2>Memuat config konsolidasi</h2>
+        <p>Mengambil versi terbaru dari backend Odoo, lalu menyiapkan fallback lokal.</p>
+      </div>
     </section>
 
-    <section class="editor-card">
-      <div class="toolbar">
-        <button type="button" class="btn primary" @click="saveConfig">Simpan Config</button>
-        <button type="button" class="btn" @click="reloadFromStorage">Muat Ulang</button>
-        <button type="button" class="btn" @click="loadTemplate">Muat Template</button>
-        <button type="button" class="btn" @click="resetToDefault">Reset Default</button>
-        <button type="button" class="btn" @click="triggerImport">Import JSON</button>
-        <button type="button" class="btn" @click="exportConfig">Export JSON</button>
-      </div>
-
-      <div class="mode-switch" role="tablist" aria-label="Mode Editor Config">
-        <button
-          type="button"
-          class="mode-btn"
-          :class="{ active: editorMode === 'table' }"
-          @click="editorMode = 'table'"
-        >
-          Mode Tabel
-        </button>
-        <button
-          type="button"
-          class="mode-btn"
-          :class="{ active: editorMode === 'json' }"
-          @click="editorMode = 'json'"
-        >
-          Mode JSON
-        </button>
-      </div>
-
-      <input
-        ref="fileInputRef"
-        type="file"
-        accept="application/json"
-        class="file-input"
-        @change="importConfigFile"
-      />
-
-      <p class="status">{{ statusMessage }}</p>
-
-      <ul v-if="parseErrors.length" class="error-list">
-        <li v-for="error in parseErrors" :key="error">{{ error }}</li>
-      </ul>
-
-      <div v-if="editorMode === 'table'" class="table-mode-wrap">
-        <article class="sheet-card">
-          <div class="sheet-head">
-            <h3>Entities</h3>
-            <button type="button" class="btn" @click="addEntity">Tambah Baris</button>
-          </div>
-          <div class="sheet-scroll">
-            <table class="sheet-table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Name</th>
-                  <th>Source</th>
-                  <th>Enabled</th>
-                  <th>Ownership %</th>
-                  <th>Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(row, idx) in config.entities" :key="`ent-${idx}`">
-                  <td><input v-model="row.id" type="text" @input="markTableChanged" /></td>
-                  <td><input v-model="row.name" type="text" @input="markTableChanged" /></td>
-                  <td>
-                    <select v-model="row.source" @change="markTableChanged">
-                      <option value="odoo">odoo</option>
-                      <option value="bprs">bprs</option>
-                      <option value="jabmart">jabmart</option>
-                      <option value="uspps">uspps</option>
-                      <option value="manual">manual</option>
-                    </select>
-                  </td>
-                  <td class="cell-center">
-                    <input v-model="row.enabled" type="checkbox" @change="markTableChanged" />
-                  </td>
-                  <td>
-                    <input
-                      :value="row.ownershipPct ?? ''"
-                      type="number"
-                      min="0"
-                      max="100"
-                      step="0.01"
-                      @input="updateOwnershipPct(row, $event)"
-                    />
-                  </td>
-                  <td class="cell-center">
-                    <button type="button" class="btn danger" @click="removeEntity(idx)">
-                      Hapus
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+    <template v-else>
+      <div class="summary-grid">
+        <article class="stat-card">
+          <p class="stat-label">Entitas Aktif</p>
+          <p class="stat-value">{{ summary.entities }}</p>
         </article>
-
-        <article class="sheet-card">
-          <div class="sheet-head">
-            <h3>COA Mappings</h3>
-            <button type="button" class="btn" @click="addMapping">Tambah Baris</button>
-          </div>
-          <div class="sheet-scroll">
-            <table class="sheet-table">
-              <thead>
-                <tr>
-                  <th>Entity</th>
-                  <th>Source Account</th>
-                  <th>Desc Contains</th>
-                  <th>Consolidation Key</th>
-                  <th>Section</th>
-                  <th>Parent Key</th>
-                  <th>Line Type</th>
-                  <th>Sign</th>
-                  <th>Note</th>
-                  <th>Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(row, idx) in config.coaMappings" :key="`map-${idx}`">
-                  <td><input v-model="row.entityId" type="text" @input="markTableChanged" /></td>
-                  <td>
-                    <input v-model="row.sourceAccount" type="text" @input="markTableChanged" />
-                  </td>
-                  <td>
-                    <input
-                      :value="row.sourceDescriptionContains ?? ''"
-                      type="text"
-                      @input="updateMappingDescContains(row, $event)"
-                    />
-                  </td>
-                  <td>
-                    <input v-model="row.consolidationKey" type="text" @input="markTableChanged" />
-                  </td>
-                  <td>
-                    <select v-model="row.section" @change="markTableChanged">
-                      <option value="pnl">pnl</option>
-                      <option value="balance-sheet">balance-sheet</option>
-                      <option value="trial-balance">trial-balance</option>
-                    </select>
-                  </td>
-                  <td>
-                    <input
-                      :value="row.parentKey ?? ''"
-                      type="text"
-                      @input="updateMappingParentKey(row, $event)"
-                    />
-                  </td>
-                  <td>
-                    <select v-model="row.lineType" @change="markTableChanged">
-                      <option value="header">header</option>
-                      <option value="detail">detail</option>
-                      <option value="subtotal">subtotal</option>
-                      <option value="total">total</option>
-                      <option value="derived">derived</option>
-                    </select>
-                  </td>
-                  <td>
-                    <select v-model.number="row.sign" @change="markTableChanged">
-                      <option :value="1">1</option>
-                      <option :value="-1">-1</option>
-                    </select>
-                  </td>
-                  <td>
-                    <input
-                      :value="row.note ?? ''"
-                      type="text"
-                      @input="updateMappingNote(row, $event)"
-                    />
-                  </td>
-                  <td class="cell-center">
-                    <button type="button" class="btn danger" @click="removeMapping(idx)">
-                      Hapus
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+        <article class="stat-card">
+          <p class="stat-label">COA Mapping</p>
+          <p class="stat-value">{{ summary.mappings }}</p>
         </article>
-
-        <article class="sheet-card">
-          <div class="sheet-head">
-            <h3>Report Tree</h3>
-            <button type="button" class="btn" @click="addTreeNode">Tambah Baris</button>
-          </div>
-          <div class="sheet-scroll">
-            <table class="sheet-table">
-              <thead>
-                <tr>
-                  <th>Key</th>
-                  <th>Section</th>
-                  <th>Label</th>
-                  <th>Line Type</th>
-                  <th>Parent Key</th>
-                  <th>Order</th>
-                  <th>Formula</th>
-                  <th>Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(row, idx) in config.reportTree" :key="`tree-${idx}`">
-                  <td><input v-model="row.key" type="text" @input="markTableChanged" /></td>
-                  <td>
-                    <select v-model="row.section" @change="markTableChanged">
-                      <option value="pnl">pnl</option>
-                      <option value="balance-sheet">balance-sheet</option>
-                      <option value="trial-balance">trial-balance</option>
-                    </select>
-                  </td>
-                  <td><input v-model="row.label" type="text" @input="markTableChanged" /></td>
-                  <td>
-                    <select v-model="row.lineType" @change="markTableChanged">
-                      <option value="header">header</option>
-                      <option value="detail">detail</option>
-                      <option value="subtotal">subtotal</option>
-                      <option value="total">total</option>
-                      <option value="derived">derived</option>
-                    </select>
-                  </td>
-                  <td>
-                    <input
-                      :value="row.parentKey ?? ''"
-                      type="text"
-                      @input="updateTreeParentKey(row, $event)"
-                    />
-                  </td>
-                  <td>
-                    <input :value="row.order" type="number" @input="updateTreeOrder(row, $event)" />
-                  </td>
-                  <td>
-                    <input
-                      :value="row.formula ?? ''"
-                      type="text"
-                      @input="updateTreeFormula(row, $event)"
-                    />
-                  </td>
-                  <td class="cell-center">
-                    <button type="button" class="btn danger" @click="removeTreeNode(idx)">
-                      Hapus
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+        <article class="stat-card">
+          <p class="stat-label">Node Report Tree</p>
+          <p class="stat-value">{{ summary.treeNodes }}</p>
         </article>
-
-        <article class="sheet-card">
-          <div class="sheet-head">
-            <h3>Elimination Rules</h3>
-            <button type="button" class="btn" @click="addEliminationRule">Tambah Baris</button>
-          </div>
-          <div class="sheet-scroll">
-            <table class="sheet-table">
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>Name</th>
-                  <th>Enabled</th>
-                  <th>Section</th>
-                  <th>Debit Key</th>
-                  <th>Credit Key</th>
-                  <th>Scope</th>
-                  <th>Entity A</th>
-                  <th>Entity B</th>
-                  <th>Method</th>
-                  <th>Percentage</th>
-                  <th>Note</th>
-                  <th>Aksi</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr v-for="(row, idx) in config.eliminationRules" :key="`elim-${idx}`">
-                  <td><input v-model="row.id" type="text" @input="markTableChanged" /></td>
-                  <td><input v-model="row.name" type="text" @input="markTableChanged" /></td>
-                  <td class="cell-center">
-                    <input v-model="row.enabled" type="checkbox" @change="markTableChanged" />
-                  </td>
-                  <td>
-                    <select v-model="row.section" @change="markTableChanged">
-                      <option value="pnl">pnl</option>
-                      <option value="balance-sheet">balance-sheet</option>
-                      <option value="trial-balance">trial-balance</option>
-                    </select>
-                  </td>
-                  <td>
-                    <select v-model="row.debitKey" @change="markTableChanged">
-                      <option value="">-- pilih key --</option>
-                      <option
-                        v-for="key in getEliminationKeyOptions(row.section)"
-                        :key="`debit-${row.id}-${key}`"
-                        :value="key"
-                      >
-                        {{ key }}
-                      </option>
-                      <option
-                        v-if="
-                          row.debitKey &&
-                          !getEliminationKeyOptions(row.section).includes(row.debitKey)
-                        "
-                        :value="row.debitKey"
-                      >
-                        {{ row.debitKey }} (custom)
-                      </option>
-                    </select>
-                  </td>
-                  <td>
-                    <select v-model="row.creditKey" @change="markTableChanged">
-                      <option value="">-- pilih key --</option>
-                      <option
-                        v-for="key in getEliminationKeyOptions(row.section)"
-                        :key="`credit-${row.id}-${key}`"
-                        :value="key"
-                      >
-                        {{ key }}
-                      </option>
-                      <option
-                        v-if="
-                          row.creditKey &&
-                          !getEliminationKeyOptions(row.section).includes(row.creditKey)
-                        "
-                        :value="row.creditKey"
-                      >
-                        {{ row.creditKey }} (custom)
-                      </option>
-                    </select>
-                  </td>
-                  <td>
-                    <select v-model="row.scope" @change="onScopeChanged(row)">
-                      <option value="all">all</option>
-                      <option value="entity-pair">entity-pair</option>
-                    </select>
-                  </td>
-                  <td>
-                    <select
-                      :value="row.entityPair?.[0] ?? ''"
-                      @change="updateEntityPair(row, 0, $event)"
-                    >
-                      <option value="">-- pilih entitas --</option>
-                      <option
-                        v-for="entity in entityIdOptions"
-                        :key="`entity-a-${row.id}-${entity.id}`"
-                        :value="entity.id"
-                      >
-                        {{ entity.label }}
-                      </option>
-                    </select>
-                  </td>
-                  <td>
-                    <select
-                      :value="row.entityPair?.[1] ?? ''"
-                      @change="updateEntityPair(row, 1, $event)"
-                    >
-                      <option value="">-- pilih entitas --</option>
-                      <option
-                        v-for="entity in entityIdOptions"
-                        :key="`entity-b-${row.id}-${entity.id}`"
-                        :value="entity.id"
-                      >
-                        {{ entity.label }}
-                      </option>
-                    </select>
-                  </td>
-                  <td>
-                    <select v-model="row.method" @change="onMethodChanged(row)">
-                      <option value="full">full</option>
-                      <option value="percentage">percentage</option>
-                    </select>
-                  </td>
-                  <td>
-                    <input
-                      :value="row.percentage ?? ''"
-                      type="number"
-                      min="0"
-                      max="100"
-                      :disabled="row.method !== 'percentage'"
-                      @input="updateEliminationPercentage(row, $event)"
-                    />
-                  </td>
-                  <td>
-                    <input
-                      :value="row.note ?? ''"
-                      type="text"
-                      @input="updateEliminationNote(row, $event)"
-                    />
-                  </td>
-                  <td class="cell-center">
-                    <button type="button" class="btn danger" @click="removeEliminationRule(idx)">
-                      Hapus
-                    </button>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
+        <article class="stat-card">
+          <p class="stat-label">Rule Eliminasi</p>
+          <p class="stat-value">{{ summary.eliminationRules }}</p>
         </article>
       </div>
 
-      <textarea
-        v-else
-        v-model="jsonText"
-        class="json-editor"
-        spellcheck="false"
-        aria-label="Consolidation JSON Config Editor"
-      />
-    </section>
+      <section class="help-card">
+        <h2>Yang Perlu Anda Tambahkan</h2>
+        <ol>
+          <li>Lengkapi entities sesuai seluruh anak perusahaan yang masuk konsolidasi.</li>
+          <li>Isi coaMappings untuk setiap COA source ke consolidationKey target.</li>
+          <li>Bangun reportTree untuk struktur final laporan konsolidasi.</li>
+          <li>Definisikan eliminationRules untuk transaksi antar entitas (intercompany).</li>
+        </ol>
+      </section>
+
+      <section class="editor-card">
+        <div class="toolbar">
+          <button type="button" class="btn primary" @click="saveConfig">Simpan Config</button>
+          <button type="button" class="btn" @click="reloadFromStorage">Muat Ulang Backend</button>
+          <button type="button" class="btn" @click="loadTemplate">Muat Template</button>
+          <button type="button" class="btn" @click="resetToDefault">Reset Default</button>
+          <button type="button" class="btn" @click="triggerImport">Import JSON</button>
+          <button type="button" class="btn" @click="exportConfig">Export JSON</button>
+        </div>
+
+        <div class="mode-switch" role="tablist" aria-label="Mode Editor Config">
+          <button
+            type="button"
+            class="mode-btn"
+            :class="{ active: editorMode === 'table' }"
+            @click="editorMode = 'table'"
+          >
+            Mode Tabel
+          </button>
+          <button
+            type="button"
+            class="mode-btn"
+            :class="{ active: editorMode === 'json' }"
+            @click="editorMode = 'json'"
+          >
+            Mode JSON
+          </button>
+        </div>
+
+        <input
+          ref="fileInputRef"
+          type="file"
+          accept="application/json"
+          class="file-input"
+          @change="importConfigFile"
+        />
+
+        <p class="status">{{ statusMessage }}</p>
+        <p v-if="!isLoading" class="source-badge" :class="`source-${activeSourceTone}`">
+          Sumber aktif: {{ activeSourceLabel }}
+        </p>
+
+        <ul v-if="parseErrors.length" class="error-list">
+          <li v-for="error in parseErrors" :key="error">{{ error }}</li>
+        </ul>
+
+        <div v-if="editorMode === 'table'" class="table-mode-wrap">
+          <article class="sheet-card">
+            <div class="sheet-head">
+              <h3>Entities</h3>
+              <button type="button" class="btn" @click="addEntity">Tambah Baris</button>
+            </div>
+            <div class="sheet-scroll">
+              <table class="sheet-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Source</th>
+                    <th>Enabled</th>
+                    <th>Ownership %</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(row, idx) in config.entities" :key="`ent-${idx}`">
+                    <td><input v-model="row.id" type="text" @input="markTableChanged" /></td>
+                    <td><input v-model="row.name" type="text" @input="markTableChanged" /></td>
+                    <td>
+                      <select v-model="row.source" @change="markTableChanged">
+                        <option value="odoo">odoo</option>
+                        <option value="bprs">bprs</option>
+                        <option value="jabmart">jabmart</option>
+                        <option value="uspps">uspps</option>
+                        <option value="manual">manual</option>
+                      </select>
+                    </td>
+                    <td class="cell-center">
+                      <input v-model="row.enabled" type="checkbox" @change="markTableChanged" />
+                    </td>
+                    <td>
+                      <input
+                        :value="row.ownershipPct ?? ''"
+                        type="number"
+                        min="0"
+                        max="100"
+                        step="0.01"
+                        @input="updateOwnershipPct(row, $event)"
+                      />
+                    </td>
+                    <td class="cell-center">
+                      <button type="button" class="btn danger" @click="removeEntity(idx)">
+                        Hapus
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="sheet-card">
+            <div class="sheet-head">
+              <h3>COA Mappings</h3>
+              <button type="button" class="btn" @click="addMapping">Tambah Baris</button>
+            </div>
+            <div class="sheet-scroll">
+              <table class="sheet-table">
+                <thead>
+                  <tr>
+                    <th>Entity</th>
+                    <th>Source Account</th>
+                    <th>Desc Contains</th>
+                    <th>Consolidation Key</th>
+                    <th>Section</th>
+                    <th>Parent Key</th>
+                    <th>Line Type</th>
+                    <th>Sign</th>
+                    <th>Note</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(row, idx) in config.coaMappings" :key="`map-${idx}`">
+                    <td>
+                      <select
+                        v-model="row.entityId"
+                        @change="markTableChanged"
+                        @keydown="preventSelectTyping"
+                      >
+                        <option value="">-- pilih entity --</option>
+                        <option
+                          v-for="entity in entityIdOptions"
+                          :key="entity.id"
+                          :value="entity.id"
+                        >
+                          {{ entity.label }}
+                        </option>
+                      </select>
+                    </td>
+                    <td>
+                      <input v-model="row.sourceAccount" type="text" @input="markTableChanged" />
+                    </td>
+                    <td>
+                      <input
+                        :value="row.sourceDescriptionContains ?? ''"
+                        type="text"
+                        @input="updateMappingDescContains(row, $event)"
+                      />
+                    </td>
+                    <td>
+                      <input v-model="row.consolidationKey" type="text" @input="markTableChanged" />
+                    </td>
+                    <td>
+                      <select v-model="row.section" @change="markTableChanged">
+                        <option value="pnl">pnl</option>
+                        <option value="balance-sheet">balance-sheet</option>
+                        <option value="trial-balance">trial-balance</option>
+                      </select>
+                    </td>
+                    <td>
+                      <input
+                        :value="row.parentKey ?? ''"
+                        type="text"
+                        @input="updateMappingParentKey(row, $event)"
+                      />
+                    </td>
+                    <td>
+                      <select v-model="row.lineType" @change="markTableChanged">
+                        <option value="header">header</option>
+                        <option value="detail">detail</option>
+                        <option value="subtotal">subtotal</option>
+                        <option value="total">total</option>
+                        <option value="derived">derived</option>
+                      </select>
+                    </td>
+                    <td>
+                      <select v-model.number="row.sign" @change="markTableChanged">
+                        <option :value="1">1</option>
+                        <option :value="-1">-1</option>
+                      </select>
+                    </td>
+                    <td>
+                      <input
+                        :value="row.note ?? ''"
+                        type="text"
+                        @input="updateMappingNote(row, $event)"
+                      />
+                    </td>
+                    <td class="cell-center">
+                      <button type="button" class="btn danger" @click="removeMapping(idx)">
+                        Hapus
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="sheet-card">
+            <div class="sheet-head">
+              <h3>Report Tree</h3>
+              <button type="button" class="btn" @click="addTreeNode">Tambah Baris</button>
+            </div>
+            <div class="sheet-scroll">
+              <table class="sheet-table">
+                <thead>
+                  <tr>
+                    <th>Key</th>
+                    <th>Section</th>
+                    <th>Label</th>
+                    <th>Line Type</th>
+                    <th>Parent Key</th>
+                    <th>Order</th>
+                    <th>Formula</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(row, idx) in config.reportTree" :key="`tree-${idx}`">
+                    <td><input v-model="row.key" type="text" @input="markTableChanged" /></td>
+                    <td>
+                      <select v-model="row.section" @change="markTableChanged">
+                        <option value="pnl">pnl</option>
+                        <option value="balance-sheet">balance-sheet</option>
+                        <option value="trial-balance">trial-balance</option>
+                      </select>
+                    </td>
+                    <td><input v-model="row.label" type="text" @input="markTableChanged" /></td>
+                    <td>
+                      <select v-model="row.lineType" @change="markTableChanged">
+                        <option value="header">header</option>
+                        <option value="detail">detail</option>
+                        <option value="subtotal">subtotal</option>
+                        <option value="total">total</option>
+                        <option value="derived">derived</option>
+                      </select>
+                    </td>
+                    <td>
+                      <input
+                        :value="row.parentKey ?? ''"
+                        type="text"
+                        @input="updateTreeParentKey(row, $event)"
+                      />
+                    </td>
+                    <td>
+                      <input
+                        :value="row.order"
+                        type="number"
+                        @input="updateTreeOrder(row, $event)"
+                      />
+                    </td>
+                    <td>
+                      <input
+                        :value="row.formula ?? ''"
+                        type="text"
+                        @input="updateTreeFormula(row, $event)"
+                      />
+                    </td>
+                    <td class="cell-center">
+                      <button type="button" class="btn danger" @click="removeTreeNode(idx)">
+                        Hapus
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+
+          <article class="sheet-card">
+            <div class="sheet-head">
+              <h3>Elimination Rules</h3>
+              <button type="button" class="btn" @click="addEliminationRule">Tambah Baris</button>
+            </div>
+            <div class="sheet-scroll">
+              <table class="sheet-table">
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Name</th>
+                    <th>Enabled</th>
+                    <th>Section</th>
+                    <th>Debit Key</th>
+                    <th>Credit Key</th>
+                    <th>Scope</th>
+                    <th>Entity A</th>
+                    <th>Entity B</th>
+                    <th>Method</th>
+                    <th>Percentage</th>
+                    <th>Note</th>
+                    <th>Aksi</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr v-for="(row, idx) in config.eliminationRules" :key="`elim-${idx}`">
+                    <td><input v-model="row.id" type="text" @input="markTableChanged" /></td>
+                    <td><input v-model="row.name" type="text" @input="markTableChanged" /></td>
+                    <td class="cell-center">
+                      <input v-model="row.enabled" type="checkbox" @change="markTableChanged" />
+                    </td>
+                    <td>
+                      <select v-model="row.section" @change="markTableChanged">
+                        <option value="pnl">pnl</option>
+                        <option value="balance-sheet">balance-sheet</option>
+                        <option value="trial-balance">trial-balance</option>
+                      </select>
+                    </td>
+                    <td>
+                      <select v-model="row.debitKey" @change="markTableChanged">
+                        <option value="">-- pilih key --</option>
+                        <option
+                          v-for="key in getEliminationKeyOptions(row.section)"
+                          :key="`debit-${row.id}-${key}`"
+                          :value="key"
+                        >
+                          {{ key }}
+                        </option>
+                        <option
+                          v-if="
+                            row.debitKey &&
+                            !getEliminationKeyOptions(row.section).includes(row.debitKey)
+                          "
+                          :value="row.debitKey"
+                        >
+                          {{ row.debitKey }} (custom)
+                        </option>
+                      </select>
+                    </td>
+                    <td>
+                      <select v-model="row.creditKey" @change="markTableChanged">
+                        <option value="">-- pilih key --</option>
+                        <option
+                          v-for="key in getEliminationKeyOptions(row.section)"
+                          :key="`credit-${row.id}-${key}`"
+                          :value="key"
+                        >
+                          {{ key }}
+                        </option>
+                        <option
+                          v-if="
+                            row.creditKey &&
+                            !getEliminationKeyOptions(row.section).includes(row.creditKey)
+                          "
+                          :value="row.creditKey"
+                        >
+                          {{ row.creditKey }} (custom)
+                        </option>
+                      </select>
+                    </td>
+                    <td>
+                      <select v-model="row.scope" @change="onScopeChanged(row)">
+                        <option value="all">all</option>
+                        <option value="entity-pair">entity-pair</option>
+                      </select>
+                    </td>
+                    <td>
+                      <select
+                        :value="row.entityPair?.[0] ?? ''"
+                        @change="updateEntityPair(row, 0, $event)"
+                      >
+                        <option value="">-- pilih entitas --</option>
+                        <option
+                          v-for="entity in entityIdOptions"
+                          :key="`entity-a-${row.id}-${entity.id}`"
+                          :value="entity.id"
+                        >
+                          {{ entity.label }}
+                        </option>
+                      </select>
+                    </td>
+                    <td>
+                      <select
+                        :value="row.entityPair?.[1] ?? ''"
+                        @change="updateEntityPair(row, 1, $event)"
+                      >
+                        <option value="">-- pilih entitas --</option>
+                        <option
+                          v-for="entity in entityIdOptions"
+                          :key="`entity-b-${row.id}-${entity.id}`"
+                          :value="entity.id"
+                        >
+                          {{ entity.label }}
+                        </option>
+                      </select>
+                    </td>
+                    <td>
+                      <select v-model="row.method" @change="onMethodChanged(row)">
+                        <option value="full">full</option>
+                        <option value="percentage">percentage</option>
+                      </select>
+                    </td>
+                    <td>
+                      <input
+                        :value="row.percentage ?? ''"
+                        type="number"
+                        min="0"
+                        max="100"
+                        :disabled="row.method !== 'percentage'"
+                        @input="updateEliminationPercentage(row, $event)"
+                      />
+                    </td>
+                    <td>
+                      <input
+                        :value="row.note ?? ''"
+                        type="text"
+                        @input="updateEliminationNote(row, $event)"
+                      />
+                    </td>
+                    <td class="cell-center">
+                      <button type="button" class="btn danger" @click="removeEliminationRule(idx)">
+                        Hapus
+                      </button>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+          </article>
+        </div>
+
+        <textarea
+          v-else
+          v-model="jsonText"
+          class="json-editor"
+          spellcheck="false"
+          aria-label="Consolidation JSON Config Editor"
+        />
+      </section>
+    </template>
   </section>
 </template>
 
@@ -828,6 +929,70 @@ const updateEliminationNote = (row: EliminationRule, event: Event) => {
 .page-wrap {
   display: grid;
   gap: 1rem;
+  position: relative;
+}
+
+.loading-card {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  padding: 1rem 1.1rem;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(8, 58, 101, 0.12), rgba(19, 111, 134, 0.1));
+  border: 1px solid rgba(19, 111, 134, 0.18);
+}
+
+.loading-card h2 {
+  margin: 0 0 0.2rem;
+  font-size: 1rem;
+}
+
+.loading-card p {
+  margin: 0;
+  color: #425871;
+}
+
+.loading-spinner {
+  width: 1.35rem;
+  height: 1.35rem;
+  border-radius: 999px;
+  border: 3px solid rgba(19, 111, 134, 0.2);
+  border-top-color: #126f86;
+  animation: spin 0.85s linear infinite;
+  flex: 0 0 auto;
+}
+
+.toast {
+  position: fixed;
+  top: 1rem;
+  right: 1rem;
+  z-index: 40;
+  min-width: min(20rem, calc(100vw - 2rem));
+  max-width: 24rem;
+  padding: 0.85rem 1rem;
+  border-radius: 14px;
+  box-shadow: 0 18px 40px rgba(8, 22, 44, 0.22);
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.toast-success {
+  background: linear-gradient(135deg, #0e7a55, #16916a);
+  color: #effff8;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+}
+
+.toast-fade-enter-active,
+.toast-fade-leave-active {
+  transition:
+    opacity 0.22s ease,
+    transform 0.22s ease;
+}
+
+.toast-fade-enter-from,
+.toast-fade-leave-to {
+  opacity: 0;
+  transform: translateY(-8px);
 }
 
 .hero {
@@ -961,6 +1126,36 @@ h1 {
   color: #35516f;
 }
 
+.source-badge {
+  display: inline-flex;
+  align-items: center;
+  margin: 0 0 0.7rem;
+  padding: 0.35rem 0.7rem;
+  border-radius: 999px;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  border: 1px solid transparent;
+}
+
+.source-backend {
+  background: rgba(18, 111, 134, 0.1);
+  color: #0f6d83;
+  border-color: rgba(18, 111, 134, 0.22);
+}
+
+.source-fallback {
+  background: rgba(100, 116, 139, 0.1);
+  color: #475569;
+  border-color: rgba(100, 116, 139, 0.22);
+}
+
+.source-template {
+  background: rgba(138, 92, 0, 0.1);
+  color: #8a5c00;
+  border-color: rgba(138, 92, 0, 0.22);
+}
+
 .error-list {
   margin: 0 0 0.6rem;
   padding-left: 1rem;
@@ -1045,6 +1240,12 @@ h1 {
 
 .cell-center {
   text-align: center;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @media (max-width: 960px) {

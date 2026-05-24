@@ -1,7 +1,13 @@
 <script setup lang="ts">
 import { computed, ref } from 'vue'
 import { buildConsolidationPreview } from '@/services/consolidationEngineService'
+import {
+  getDefaultConsolidationConfig,
+  loadConsolidationConfig,
+  loadConsolidationConfigFromFile,
+} from '@/services/consolidationConfigService'
 import { exportMultiSheetExcel } from '@/utils/excelExport'
+import type { ConsolidationConfig } from '@/types/consolidationConfig'
 import type { ConsolidationPreviewResult } from '@/types/consolidationResult'
 import type { ConsolidationLineType } from '@/types/consolidationConfig'
 
@@ -35,6 +41,9 @@ const periodLabel = computed(() => {
 
 // ── Report data ───────────────────────────────────────────────────────────────
 const isGenerated = ref(false)
+const isGenerating = ref(false)
+const generationStatus = ref('')
+const activeConfig = ref<ConsolidationConfig>(getDefaultConsolidationConfig())
 
 const pnlResult = ref<ConsolidationPreviewResult | null>(null)
 const bsResult = ref<ConsolidationPreviewResult | null>(null)
@@ -42,12 +51,23 @@ const tbResult = ref<ConsolidationPreviewResult | null>(null)
 
 const activeTab = ref<'balance-sheet' | 'pnl' | 'trial-balance'>('balance-sheet')
 
-const generateReports = () => {
-  pnlResult.value = buildConsolidationPreview('pnl')
-  bsResult.value = buildConsolidationPreview('balance-sheet')
-  tbResult.value = buildConsolidationPreview('trial-balance')
-  isGenerated.value = true
-  activeTab.value = 'balance-sheet'
+const generateReports = async () => {
+  isGenerating.value = true
+
+  try {
+    const fromBackend = await loadConsolidationConfigFromFile()
+    activeConfig.value = fromBackend ?? loadConsolidationConfig()
+    pnlResult.value = buildConsolidationPreview('pnl', activeConfig.value)
+    bsResult.value = buildConsolidationPreview('balance-sheet', activeConfig.value)
+    tbResult.value = buildConsolidationPreview('trial-balance', activeConfig.value)
+    generationStatus.value = fromBackend
+      ? 'Laporan dihitung dari config backend Odoo yang aktif.'
+      : 'Backend Odoo tidak tersedia. Laporan dihitung dari template default.'
+    isGenerated.value = true
+    activeTab.value = 'balance-sheet'
+  } finally {
+    isGenerating.value = false
+  }
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
@@ -153,11 +173,17 @@ const exportXls = () => {
           </select>
         </label>
         <div class="wizard-actions">
-          <button type="button" class="btn-primary" @click="generateReports">
+          <button
+            type="button"
+            class="btn-primary"
+            :disabled="isGenerating"
+            @click="generateReports"
+          >
             Tampilkan Laporan
           </button>
         </div>
       </div>
+      <p v-if="generationStatus" class="period-badge">{{ generationStatus }}</p>
       <p v-if="isGenerated" class="period-badge">
         Periode Aktif: <strong>{{ periodLabel }}</strong>
       </p>

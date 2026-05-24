@@ -3,6 +3,7 @@ import { fetchOdooJsonConfigByCode, upsertOdooJsonConfig } from '@/services/odoo
 import type { ConsolidationConfig } from '@/types/consolidationConfig'
 
 const STORAGE_KEY = 'consolidation:config:v1'
+const LAST_CONFIRMED_KEY = 'consolidation:config:last-confirmed-backend:v1'
 const ODOO_CONFIG_CODE = 'sakep_consolidated_report'
 const ODOO_CONFIG_NAME = 'SAKep Consolidated Report'
 
@@ -19,82 +20,13 @@ export const getDefaultConsolidationConfig = (): ConsolidationConfig => {
   return cloneDefault()
 }
 
-const persistToStorage = (config: ConsolidationConfig) => {
+const clearStoredConfigCache = () => {
   if (typeof window === 'undefined') {
     return
   }
 
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(config, null, 2))
-}
-
-const mergeMissingDefaultEntities = (config: ConsolidationConfig): ConsolidationConfig => {
-  const defaults = cloneDefault()
-  const existingEntityIds = new Set(config.entities.map((entity) => entity.id))
-
-  const missingDefaultEntities = defaults.entities.filter(
-    (entity) => !existingEntityIds.has(entity.id),
-  )
-  if (missingDefaultEntities.length === 0) {
-    return config
-  }
-
-  return {
-    ...config,
-    entities: [...config.entities, ...missingDefaultEntities],
-  }
-}
-
-const mappingIdentity = (entityId: string, section: string, sourceAccount: string) => {
-  return `${entityId}|${section}|${sourceAccount}`
-}
-
-const reportTreeIdentity = (section: string, key: string) => {
-  return `${section}|${key}`
-}
-
-const mergeMissingDefaultMappings = (config: ConsolidationConfig): ConsolidationConfig => {
-  const defaults = cloneDefault()
-  const existingMappingIds = new Set(
-    config.coaMappings.map((mapping) =>
-      mappingIdentity(mapping.entityId, mapping.section, mapping.sourceAccount),
-    ),
-  )
-
-  const missingDefaultMappings = defaults.coaMappings.filter(
-    (mapping) =>
-      !existingMappingIds.has(
-        mappingIdentity(mapping.entityId, mapping.section, mapping.sourceAccount),
-      ),
-  )
-
-  if (missingDefaultMappings.length === 0) {
-    return config
-  }
-
-  return {
-    ...config,
-    coaMappings: [...config.coaMappings, ...missingDefaultMappings],
-  }
-}
-
-const mergeMissingDefaultReportTree = (config: ConsolidationConfig): ConsolidationConfig => {
-  const defaults = cloneDefault()
-  const existingNodeIds = new Set(
-    config.reportTree.map((node) => reportTreeIdentity(node.section, node.key)),
-  )
-
-  const missingDefaultNodes = defaults.reportTree.filter(
-    (node) => !existingNodeIds.has(reportTreeIdentity(node.section, node.key)),
-  )
-
-  if (missingDefaultNodes.length === 0) {
-    return config
-  }
-
-  return {
-    ...config,
-    reportTree: [...config.reportTree, ...missingDefaultNodes],
-  }
+  window.localStorage.removeItem(STORAGE_KEY)
+  window.localStorage.removeItem(LAST_CONFIRMED_KEY)
 }
 
 const isObject = (value: unknown): value is Record<string, unknown> => {
@@ -136,55 +68,16 @@ export const validateConsolidationConfig = (value: unknown): string[] => {
 }
 
 export const readStoredConsolidationConfig = (): ConsolidationConfig | null => {
-  if (typeof window === 'undefined') {
-    return null
-  }
-
-  const raw = window.localStorage.getItem(STORAGE_KEY)
-  if (!raw) {
-    return null
-  }
-
-  try {
-    const parsed = JSON.parse(raw) as unknown
-    const errors = validateConsolidationConfig(parsed)
-    if (errors.length > 0) {
-      return null
-    }
-
-    return parsed as ConsolidationConfig
-  } catch {
-    return null
-  }
+  return null
 }
 
 export const loadConsolidationConfig = (): ConsolidationConfig => {
-  const stored = readStoredConsolidationConfig()
-  if (!stored) {
-    return cloneDefault()
-  }
-
-  const mergedEntities = mergeMissingDefaultEntities(stored)
-  const mergedMappings = mergeMissingDefaultMappings(mergedEntities)
-  const merged = mergeMissingDefaultReportTree(mergedMappings)
-
-  if (
-    merged.entities.length !== stored.entities.length ||
-    merged.coaMappings.length !== stored.coaMappings.length ||
-    merged.reportTree.length !== stored.reportTree.length
-  ) {
-    persistToStorage(merged)
-  }
-
-  return merged
+  clearStoredConfigCache()
+  return cloneDefault()
 }
 
-const normalizeAndPersistConfig = (config: ConsolidationConfig): ConsolidationConfig => {
-  const mergedEntities = mergeMissingDefaultEntities(config)
-  const mergedMappings = mergeMissingDefaultMappings(mergedEntities)
-  const merged = mergeMissingDefaultReportTree(mergedMappings)
-  persistToStorage(merged)
-  return merged
+const normalizeConfig = (config: ConsolidationConfig): ConsolidationConfig => {
+  return JSON.parse(JSON.stringify(config)) as ConsolidationConfig
 }
 
 export const loadConsolidationConfigFromBackend = async (): Promise<ConsolidationConfig | null> => {
@@ -193,6 +86,7 @@ export const loadConsolidationConfigFromBackend = async (): Promise<Consolidatio
   }
 
   try {
+    clearStoredConfigCache()
     const record = await fetchOdooJsonConfigByCode(ODOO_CONFIG_CODE)
     if (!record?.config) {
       return null
@@ -204,7 +98,7 @@ export const loadConsolidationConfigFromBackend = async (): Promise<Consolidatio
       return null
     }
 
-    return normalizeAndPersistConfig(parsed as ConsolidationConfig)
+    return normalizeConfig(JSON.parse(JSON.stringify(parsed)) as ConsolidationConfig)
   } catch {
     return null
   }
@@ -215,7 +109,7 @@ export const loadConsolidationConfigFromFile = loadConsolidationConfigFromBacken
 export const saveConsolidationConfig = async (
   config: ConsolidationConfig,
 ): Promise<SaveConsolidationConfigResult> => {
-  const normalized = normalizeAndPersistConfig(config)
+  const normalized = normalizeConfig(config)
 
   if (typeof window === 'undefined') {
     return {
@@ -232,8 +126,11 @@ export const saveConsolidationConfig = async (
       config: normalized,
     })
 
+    clearStoredConfigCache()
+
     return { mode: 'backend-and-storage' }
   } catch (error) {
+    clearStoredConfigCache()
     return {
       mode: 'storage-only',
       error:

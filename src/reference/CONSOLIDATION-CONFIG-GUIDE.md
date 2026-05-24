@@ -31,7 +31,7 @@ Field utama:
 4. Route: /consolidation/config.
 5. Pilih Mode Tabel untuk edit model baris-kolom seperti spreadsheet.
 6. Ubah nilai per sel pada tabel Entities, COA Mappings, Report Tree, dan Elimination Rules.
-7. Klik Simpan Config untuk validasi + simpan ke browser localStorage.
+7. Klik Simpan Config untuk validasi, simpan permanen ke backend Odoo, lalu cache ke browser storage.
 8. Gunakan Export JSON untuk backup/commit, dan Import JSON untuk memuat file revisi.
 9. Buka menu Konsolidasi > Preview Agregasi & Eliminasi (route: /consolidation/preview).
 10. Pilih section report lalu klik Hitung Ulang Preview untuk melihat before/elimination/after.

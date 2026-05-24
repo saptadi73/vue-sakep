@@ -32,7 +32,10 @@ import { RouterLink } from 'vue-router'
         <li>Buka halaman Config di menu Konsolidasi atau route /consolidation/config.</li>
         <li>Pilih Mode Tabel untuk edit baris-kolom seperti Excel.</li>
         <li>Lengkapi sheet Entities, COA Mappings, Report Tree, dan Elimination Rules.</li>
-        <li>Klik Simpan Config untuk validasi dan simpan ke localStorage.</li>
+        <li>
+          Klik Simpan Config untuk validasi, simpan permanen ke backend Odoo, dan cache ke browser
+          storage.
+        </li>
         <li>Gunakan Export JSON untuk backup atau commit ke repository.</li>
         <li>Jika ada file revisi dari tim lain, gunakan Import JSON.</li>
         <li>Buka halaman Preview, lalu klik Hitung Ulang Preview untuk validasi hasil.</li>
