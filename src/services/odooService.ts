@@ -13,7 +13,9 @@ import type {
 
 const SERVER_URL_STORAGE_KEY = 'odoo:server-url'
 const DEFAULT_API_BASE_URL = (
-  import.meta.env.VITE_ODOO_API_BASE_URL ?? import.meta.env.VITE_ODOO_BASE_URL ?? ''
+  import.meta.env.VITE_ODOO_API_BASE_URL ??
+  import.meta.env.VITE_ODOO_BASE_URL ??
+  ''
 ).replace(/\/$/, '')
 
 const normalizeServerUrl = (url: string) => url.trim().replace(/\/$/, '')

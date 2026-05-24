@@ -237,7 +237,9 @@ export const saveConsolidationConfig = async (
     return {
       mode: 'storage-only',
       error:
-        error instanceof Error ? error.message : 'Gagal menghubungi API backend untuk simpan config.',
+        error instanceof Error
+          ? error.message
+          : 'Gagal menghubungi API backend untuk simpan config.',
     }
   }
 }

@@ -15,20 +15,20 @@ Fokus dokumen ini:
 
 ## Ringkasan Endpoint
 
-| Endpoint | Method | Auth | Tujuan |
-|---|---|---|---|
-| `/api/accounting/authenticate` | `POST` | public | login dan membuat session Odoo |
-| `/api/accounting/companies` | `POST` | user | daftar company yang bisa diakses user |
-| `/api/accounting/reports/balance-sheet` | `POST` | user | laporan Balance Sheet |
-| `/api/accounting/reports/profit-loss` | `POST` | user | laporan Profit and Loss |
-| `/api/accounting/reports/trial-balance` | `POST` | user | laporan Trial Balance |
-| `/api/accounting/reports/general-ledger` | `POST` | user | laporan General Ledger summary dan detail |
-| `/api/accounting/journal-entry` | `POST` | user | detail journal entry dari GL |
-| `/api/accounting/configs` | `POST` | user | list JSON config SAKep |
-| `/api/accounting/configs/get` | `POST` | user | ambil satu JSON config SAKep |
-| `/api/accounting/configs/create` | `POST` | user | buat JSON config SAKep |
-| `/api/accounting/configs/update` | `POST` | user | update JSON config SAKep |
-| `/api/accounting/configs/delete` | `POST` | user | archive/hapus JSON config SAKep |
+| Endpoint                                 | Method | Auth   | Tujuan                                    |
+| ---------------------------------------- | ------ | ------ | ----------------------------------------- |
+| `/api/accounting/authenticate`           | `POST` | public | login dan membuat session Odoo            |
+| `/api/accounting/companies`              | `POST` | user   | daftar company yang bisa diakses user     |
+| `/api/accounting/reports/balance-sheet`  | `POST` | user   | laporan Balance Sheet                     |
+| `/api/accounting/reports/profit-loss`    | `POST` | user   | laporan Profit and Loss                   |
+| `/api/accounting/reports/trial-balance`  | `POST` | user   | laporan Trial Balance                     |
+| `/api/accounting/reports/general-ledger` | `POST` | user   | laporan General Ledger summary dan detail |
+| `/api/accounting/journal-entry`          | `POST` | user   | detail journal entry dari GL              |
+| `/api/accounting/configs`                | `POST` | user   | list JSON config SAKep                    |
+| `/api/accounting/configs/get`            | `POST` | user   | ambil satu JSON config SAKep              |
+| `/api/accounting/configs/create`         | `POST` | user   | buat JSON config SAKep                    |
+| `/api/accounting/configs/update`         | `POST` | user   | update JSON config SAKep                  |
+| `/api/accounting/configs/delete`         | `POST` | user   | archive/hapus JSON config SAKep           |
 
 ## Base URL
 
@@ -54,7 +54,7 @@ Flow:
 Untuk Vue.js yang berbeda domain, request harus memakai:
 
 ```js
-credentials: "include"
+credentials: 'include'
 ```
 
 Server juga perlu disiapkan untuk CORS dan cookie policy jika frontend beda domain.
@@ -85,6 +85,12 @@ Variable ini bukan `.env` frontend Vue. `.env` frontend cukup mengarah ke base U
 VITE_ODOO_BASE_URL=https://siskab.kanjabung.com
 ```
 
+Atau gunakan nama variable berikut (juga didukung oleh frontend saat ini):
+
+```text
+VITE_ODOO_API_BASE_URL=https://siskab.kanjabung.com
+```
+
 Untuk lebih dari satu origin, pisahkan dengan koma:
 
 ```text
@@ -99,11 +105,11 @@ Frontend perlu menyediakan halaman login sendiri sebelum user membuka dashboard 
 
 Field minimum pada halaman login:
 
-| Field | Type | Keterangan |
-|---|---:|---|
-| `login` | string | Email/username user Odoo. |
-| `password` | string | Password user Odoo. |
-| `db` | string | Nama database Odoo. Bisa dibuat hidden/default jika hanya memakai satu database. |
+| Field      |   Type | Keterangan                                                                       |
+| ---------- | -----: | -------------------------------------------------------------------------------- |
+| `login`    | string | Email/username user Odoo.                                                        |
+| `password` | string | Password user Odoo.                                                              |
+| `db`       | string | Nama database Odoo. Bisa dibuat hidden/default jika hanya memakai satu database. |
 
 Tombol login memanggil endpoint:
 
@@ -116,15 +122,15 @@ POST /api/accounting/authenticate
 Config laporan konsolidasi SAKep disimpan pada model `sakep.report.json.config`.
 Field utama:
 
-| Field | Type | Keterangan |
-|---|---:|---|
-| `name` | string | Nama config yang tampil di UI. |
-| `code` | string | Key stabil untuk frontend, unik per company. |
-| `description` | string | Catatan opsional. |
-| `company_id` | integer/null | Kosong untuk global config, atau company tertentu. |
-| `active` | boolean | Status aktif. Delete default hanya archive. |
-| `sequence` | integer | Urutan tampilan. |
-| `config` | object | JSON object konfigurasi laporan konsolidasi. |
+| Field         |         Type | Keterangan                                         |
+| ------------- | -----------: | -------------------------------------------------- |
+| `name`        |       string | Nama config yang tampil di UI.                     |
+| `code`        |       string | Key stabil untuk frontend, unik per company.       |
+| `description` |       string | Catatan opsional.                                  |
+| `company_id`  | integer/null | Kosong untuk global config, atau company tertentu. |
+| `active`      |      boolean | Status aktif. Delete default hanya archive.        |
+| `sequence`    |      integer | Urutan tampilan.                                   |
+| `config`      |       object | JSON object konfigurasi laporan konsolidasi.       |
 
 ### List Config
 
@@ -163,6 +169,34 @@ Payload bisa memakai `id` atau `code`:
 }
 ```
 
+Contoh response sukses:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": null,
+  "result": {
+    "status": "success",
+    "data": {
+      "id": 7,
+      "name": "SAKep Consolidated Report",
+      "code": "sakep_consolidated_report",
+      "company_id": null,
+      "active": true,
+      "sequence": 10,
+      "config": {
+        "version": "1.0.0",
+        "groupCurrency": "IDR",
+        "entities": [],
+        "coaMappings": [],
+        "reportTree": [],
+        "eliminationRules": []
+      }
+    }
+  }
+}
+```
+
 ### Create Config
 
 ```text
@@ -185,6 +219,24 @@ POST /api/accounting/configs/create
 }
 ```
 
+Contoh response sukses:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": null,
+  "result": {
+    "status": "success",
+    "message": "Config created",
+    "data": {
+      "id": 8,
+      "name": "SAKep Consolidated Report",
+      "code": "sakep_consolidated_report"
+    }
+  }
+}
+```
+
 ### Update Config
 
 ```text
@@ -197,12 +249,28 @@ POST /api/accounting/configs/update
     "code": "sakep_consolidated_report",
     "config": {
       "companies": [1, 2, 3],
-      "external_companies": [
-        {"code": "anak_usaha_a", "name": "Anak Usaha A"}
-      ],
+      "external_companies": [{ "code": "anak_usaha_a", "name": "Anak Usaha A" }],
       "mapping": {
         "cash": ["101000", "102000"]
       }
+    }
+  }
+}
+```
+
+Contoh response sukses:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": null,
+  "result": {
+    "status": "success",
+    "message": "Config updated",
+    "data": {
+      "id": 7,
+      "name": "SAKep Consolidated Report",
+      "code": "sakep_consolidated_report"
     }
   }
 }
@@ -223,6 +291,85 @@ POST /api/accounting/configs/delete
   }
 }
 ```
+
+Contoh response sukses:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": null,
+  "result": {
+    "status": "success",
+    "message": "Config archived",
+    "data": {
+      "id": 7,
+      "code": "sakep_consolidated_report",
+      "active": false
+    }
+  }
+}
+```
+
+### Kontrak Error Endpoint Config
+
+Semua endpoint config disarankan mengikuti pola JSON-RPC Odoo yang sama agar parsing frontend konsisten.
+
+Contoh error bisnis dari method API:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": null,
+  "result": {
+    "status": "error",
+    "message": "Config dengan code sakep_consolidated_report tidak ditemukan"
+  }
+}
+```
+
+Contoh error framework/server Odoo:
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": null,
+  "error": {
+    "code": 200,
+    "message": "Odoo Server Error",
+    "data": {
+      "message": "Access denied"
+    }
+  }
+}
+```
+
+Mapping error minimum yang disarankan di frontend:
+
+1. 401/403 atau message Access denied: paksa login ulang.
+2. status=error untuk code tidak ditemukan saat update: jalankan fallback create.
+3. validasi JSON gagal: tampilkan message backend apa adanya ke user.
+4. network timeout atau host tidak bisa diakses: fallback sementara ke localStorage.
+
+### Pola Upsert yang Dipakai Frontend
+
+Untuk simpan permanen config konsolidasi, frontend memakai pola berikut:
+
+1. Coba update via POST /api/accounting/configs/update berdasarkan code.
+2. Jika update gagal karena record belum ada, lanjut create via POST /api/accounting/configs/create.
+3. Setelah sukses, cache config terbaru ke localStorage untuk fallback offline/session.
+
+Dengan pola ini, penyimpanan permanen tetap di backend Odoo, tetapi UX tetap aman saat API sementara gagal.
+
+## Alur Persistence Config Frontend
+
+Flow implementasi frontend saat ini untuk config konsolidasi:
+
+1. Frontend load config utama dari backend Odoo dengan `code = sakep_consolidated_report`.
+2. Jika backend tidak tersedia/invalid, frontend fallback ke localStorage.
+3. Jika localStorage kosong, frontend fallback ke default JSON bawaan aplikasi.
+4. Saat simpan, frontend menulis ke backend Odoo (permanen) dan tetap menyimpan cache di localStorage.
+
+Dengan flow ini, config tetap permanen di backend, tetapi frontend tetap punya default JSON sebagai safety net.
 
 Contoh request dari halaman login:
 
@@ -263,21 +410,21 @@ function unwrapOdooJsonRpc(json) {
   const payload = json.result || json
 
   if (json.error) {
-    throw new Error(json.error.data?.message || json.error.message || "Request gagal")
+    throw new Error(json.error.data?.message || json.error.message || 'Request gagal')
   }
 
-  if (!payload || payload.status === "error") {
-    throw new Error(payload?.message || "Request gagal")
+  if (!payload || payload.status === 'error') {
+    throw new Error(payload?.message || 'Request gagal')
   }
 
   return payload.data
 }
 
 async function loginToOdoo({ login, password, db }) {
-  const response = await fetch("/api/accounting/authenticate", {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
+  const response = await fetch('/api/accounting/authenticate', {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       params: { login, password, db },
     }),
@@ -293,7 +440,7 @@ Contoh alur di halaman login Vue:
 ```js
 async function submitLogin() {
   loading.value = true
-  errorMessage.value = ""
+  errorMessage.value = ''
 
   try {
     const user = await loginToOdoo({
@@ -303,7 +450,7 @@ async function submitLogin() {
     })
 
     authStore.setUser(user)
-    router.push("/finance/reports")
+    router.push('/finance/reports')
   } catch (error) {
     errorMessage.value = error.message
   } finally {
@@ -384,11 +531,11 @@ function unwrapOdooJsonRpc(json) {
   const payload = json.result || json
 
   if (json.error) {
-    throw new Error(json.error.data?.message || json.error.message || "Request gagal")
+    throw new Error(json.error.data?.message || json.error.message || 'Request gagal')
   }
 
-  if (!payload || payload.status === "error") {
-    throw new Error(payload?.message || "Request gagal")
+  if (!payload || payload.status === 'error') {
+    throw new Error(payload?.message || 'Request gagal')
   }
 
   return payload.data
@@ -488,19 +635,19 @@ Mengambil company yang boleh dipakai user untuk filter laporan.
 
 Parameter ini dipakai oleh Balance Sheet, Profit and Loss, Trial Balance, dan General Ledger.
 
-| Field | Type | Wajib | Keterangan |
-|---|---:|---:|---|
-| `company_id` | integer | tidak | Satu company. Jika `company_ids` dikirim, field ini boleh tidak dikirim. |
-| `company_ids` | array integer | tidak | Multi-company. User harus punya akses ke semua company yang dikirim. |
-| `date_from` | string `YYYY-MM-DD` | disarankan | Tanggal awal. |
-| `date_to` | string `YYYY-MM-DD` | disarankan | Tanggal akhir. |
-| `date_range` | string | tidak | Alternatif jika tidak kirim tanggal manual, contoh `this_financial_year`. |
-| `financial_year` | string | tidak | Default API: `january_december`. |
-| `target_move` | string | tidak | `posted` atau `all`. |
-| `journal_ids` | array integer | tidak | Filter journal. |
-| `analytic_ids` | array integer | tidak | Filter analytic account. |
-| `analytic_tag_ids` | array integer | tidak | Filter analytic tag. |
-| `strict_range` | boolean | tidak | Untuk Balance Sheet/Profit and Loss default API `true`. Untuk Balance Sheet, nilai `true` diperlukan agar akun dengan range `from_the_beginning` dihitung akumulatif seperti report Odoo. |
+| Field              |                Type |      Wajib | Keterangan                                                                                                                                                                                |
+| ------------------ | ------------------: | ---------: | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `company_id`       |             integer |      tidak | Satu company. Jika `company_ids` dikirim, field ini boleh tidak dikirim.                                                                                                                  |
+| `company_ids`      |       array integer |      tidak | Multi-company. User harus punya akses ke semua company yang dikirim.                                                                                                                      |
+| `date_from`        | string `YYYY-MM-DD` | disarankan | Tanggal awal.                                                                                                                                                                             |
+| `date_to`          | string `YYYY-MM-DD` | disarankan | Tanggal akhir.                                                                                                                                                                            |
+| `date_range`       |              string |      tidak | Alternatif jika tidak kirim tanggal manual, contoh `this_financial_year`.                                                                                                                 |
+| `financial_year`   |              string |      tidak | Default API: `january_december`.                                                                                                                                                          |
+| `target_move`      |              string |      tidak | `posted` atau `all`.                                                                                                                                                                      |
+| `journal_ids`      |       array integer |      tidak | Filter journal.                                                                                                                                                                           |
+| `analytic_ids`     |       array integer |      tidak | Filter analytic account.                                                                                                                                                                  |
+| `analytic_tag_ids` |       array integer |      tidak | Filter analytic tag.                                                                                                                                                                      |
+| `strict_range`     |             boolean |      tidak | Untuk Balance Sheet/Profit and Loss default API `true`. Untuk Balance Sheet, nilai `true` diperlukan agar akun dengan range `from_the_beginning` dihitung akumulatif seperti report Odoo. |
 
 Jika `company_id` dan `company_ids` kosong, backend memakai active company session.
 
@@ -552,7 +699,7 @@ Jika `company_id` dan `company_ids` kosong, backend memakai active company sessi
             "date_from": "2026-01-01",
             "date_to": "2026-12-31",
             "account_ids": [101, 102],
-            "target_moves": "posted_only",
+            "target_move": "posted",
             "initial_balance": true,
             "include_details": true
           }
@@ -590,12 +737,12 @@ Payload dan response sama seperti Balance Sheet. Perbedaannya `meta.report_type 
 
 #### Parameter tambahan
 
-| Field | Type | Default | Keterangan |
-|---|---:|---:|---|
-| `account_ids` | array integer | kosong | Filter akun tertentu. |
-| `display_accounts` | string | `balance_not_zero` | Bisa `all` atau `balance_not_zero`. |
-| `show_hierarchy` | boolean | `false` | Menampilkan struktur hierarki kode akun. |
-| `strict_range` | boolean | `false` | Mengikuti opsi strict range report existing. |
+| Field              |          Type |            Default | Keterangan                                   |
+| ------------------ | ------------: | -----------------: | -------------------------------------------- |
+| `account_ids`      | array integer |             kosong | Filter akun tertentu.                        |
+| `display_accounts` |        string | `balance_not_zero` | Bisa `all` atau `balance_not_zero`.          |
+| `show_hierarchy`   |       boolean |            `false` | Menampilkan struktur hierarki kode akun.     |
+| `strict_range`     |       boolean |            `false` | Mengikuti opsi strict range report existing. |
 
 #### Request
 
@@ -654,18 +801,18 @@ Endpoint ini punya dua mode:
 
 #### Parameter tambahan
 
-| Field | Type | Default | Keterangan |
-|---|---:|---:|---|
-| `account_id` | integer | kosong | Akun yang dibuka detailnya. |
-| `account_ids` | array integer | kosong | Filter beberapa akun untuk summary. |
-| `account_tag_ids` | array integer | kosong | Filter account tag. |
-| `partner_ids` | array integer | kosong | Filter partner. |
-| `sort_accounts_by` | string | `date` | `date` atau `journal`. |
-| `display_accounts` | string | `balance_not_zero` | `all` atau `balance_not_zero`. |
-| `initial_balance` | boolean | `true` | Sertakan opening balance. |
-| `include_details` | boolean | `false` | Sertakan detail line dalam konteks report. |
-| `page` | integer | `1` | Halaman detail move line saat `account_id` dikirim. |
-| `limit` | integer | `200` | Maksimal `1000`. |
+| Field              |          Type |            Default | Keterangan                                          |
+| ------------------ | ------------: | -----------------: | --------------------------------------------------- |
+| `account_id`       |       integer |             kosong | Akun yang dibuka detailnya.                         |
+| `account_ids`      | array integer |             kosong | Filter beberapa akun untuk summary.                 |
+| `account_tag_ids`  | array integer |             kosong | Filter account tag.                                 |
+| `partner_ids`      | array integer |             kosong | Filter partner.                                     |
+| `sort_accounts_by` |        string |             `date` | `date` atau `journal`.                              |
+| `display_accounts` |        string | `balance_not_zero` | `all` atau `balance_not_zero`.                      |
+| `initial_balance`  |       boolean |             `true` | Sertakan opening balance.                           |
+| `include_details`  |       boolean |            `false` | Sertakan detail line dalam konteks report.          |
+| `page`             |       integer |                `1` | Halaman detail move line saat `account_id` dikirim. |
+| `limit`            |       integer |              `200` | Maksimal `1000`.                                    |
 
 ### GL Summary
 
@@ -845,9 +992,9 @@ async function openFinancialLine(line) {
   if (!line.drilldown) return
 
   const response = await fetch(line.drilldown.endpoint, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ params: line.drilldown.payload }),
   })
 
@@ -868,9 +1015,9 @@ Contoh merge payload:
 ```js
 const activeFilters = {
   company_ids: [1],
-  date_from: "2026-01-01",
-  date_to: "2026-12-31",
-  target_move: "posted",
+  date_from: '2026-01-01',
+  date_to: '2026-12-31',
+  target_move: 'posted',
 }
 
 async function openGlAccount(account) {
@@ -882,9 +1029,9 @@ async function openGlAccount(account) {
   }
 
   const response = await fetch(account.drilldown.endpoint, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ params: payload }),
   })
 
@@ -907,9 +1054,9 @@ async function openJournal(line) {
   if (!line.journal_entry) return
 
   const response = await fetch(line.journal_entry.endpoint, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ params: line.journal_entry.payload }),
   })
 
@@ -925,11 +1072,11 @@ export function unwrapOdooJsonRpc(json) {
   const payload = json.result || json
 
   if (json.error) {
-    throw new Error(json.error.data?.message || json.error.message || "Odoo API error")
+    throw new Error(json.error.data?.message || json.error.message || 'Odoo API error')
   }
 
-  if (!payload || payload.status === "error") {
-    throw new Error(payload?.message || "Odoo API error")
+  if (!payload || payload.status === 'error') {
+    throw new Error(payload?.message || 'Odoo API error')
   }
 
   return payload.data
@@ -937,9 +1084,9 @@ export function unwrapOdooJsonRpc(json) {
 
 export async function odooJsonRpc(endpoint, params = {}) {
   const response = await fetch(endpoint, {
-    method: "POST",
-    credentials: "include",
-    headers: { "Content-Type": "application/json" },
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ params }),
   })
 
