@@ -88,3 +88,21 @@ export interface OdooReportRequestParams {
   target_move?: 'posted' | 'all'
   display_accounts?: 'all' | 'balance_not_zero'
 }
+
+export interface OdooJsonConfigRecord {
+  id: number
+  name: string
+  code: string
+  description?: string | null
+  company_id?: number | null
+  active?: boolean
+  sequence?: number
+  config?: unknown
+}
+
+export interface OdooJsonConfigListPayload {
+  items?: OdooJsonConfigRecord[]
+  total?: number
+  page?: number
+  limit?: number
+}

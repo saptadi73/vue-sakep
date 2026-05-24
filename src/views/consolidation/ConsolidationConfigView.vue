@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import {
   getDefaultConsolidationConfig,
   loadConsolidationConfig,
+  loadConsolidationConfigFromFile,
   resetConsolidationConfig,
   saveConsolidationConfig,
   validateConsolidationConfig,
@@ -21,6 +22,21 @@ const jsonText = ref(JSON.stringify(config.value, null, 2))
 const statusMessage = ref('Config berhasil dimuat.')
 const parseErrors = ref<string[]>([])
 const editorMode = ref<'table' | 'json'>('table')
+
+const buildSaveStatusMessage = (
+  result: Awaited<ReturnType<typeof saveConsolidationConfig>>,
+  tableMode = false,
+) => {
+  if (result.mode === 'backend-and-storage') {
+    return tableMode
+      ? 'Config tabel berhasil disimpan permanen ke backend Odoo dan browser storage.'
+      : 'Config berhasil disimpan permanen ke backend Odoo dan browser storage.'
+  }
+
+  return tableMode
+    ? `Config tabel hanya tersimpan di browser storage. ${result.error ?? ''}`.trim()
+    : `Config hanya tersimpan di browser storage. ${result.error ?? ''}`.trim()
+}
 
 const summary = computed(() => {
   const current = config.value
@@ -70,7 +86,7 @@ const markTableChanged = () => {
   statusMessage.value = 'Perubahan tabel diterapkan ke draft JSON. Klik Simpan Config untuk commit.'
 }
 
-const applyJsonText = () => {
+const applyJsonText = async () => {
   parseErrors.value = []
 
   let parsed: unknown
@@ -90,12 +106,12 @@ const applyJsonText = () => {
   }
 
   config.value = parsed as ConsolidationConfig
-  saveConsolidationConfig(config.value)
+  const saveResult = await saveConsolidationConfig(config.value)
   syncJsonFromConfig()
-  statusMessage.value = 'Config tersimpan ke browser storage.'
+  statusMessage.value = buildSaveStatusMessage(saveResult)
 }
 
-const saveTableConfig = () => {
+const saveTableConfig = async () => {
   const errors = validateConsolidationConfig(config.value)
   if (errors.length > 0) {
     parseErrors.value = errors
@@ -103,26 +119,29 @@ const saveTableConfig = () => {
     return
   }
 
-  saveConsolidationConfig(config.value)
+  const saveResult = await saveConsolidationConfig(config.value)
   syncJsonFromConfig()
   parseErrors.value = []
-  statusMessage.value = 'Config tabel berhasil disimpan ke browser storage.'
+  statusMessage.value = buildSaveStatusMessage(saveResult, true)
 }
 
-const saveConfig = () => {
+const saveConfig = async () => {
   if (editorMode.value === 'json') {
-    applyJsonText()
+    await applyJsonText()
     return
   }
 
-  saveTableConfig()
+  await saveTableConfig()
 }
 
-const reloadFromStorage = () => {
-  config.value = loadConsolidationConfig()
+const reloadFromStorage = async () => {
+  const fromFile = await loadConsolidationConfigFromFile()
+  config.value = fromFile ?? loadConsolidationConfig()
   syncJsonFromConfig()
   parseErrors.value = []
-  statusMessage.value = 'Config dimuat ulang dari storage/default.'
+  statusMessage.value = fromFile
+    ? 'Config dimuat ulang dari backend Odoo.'
+    : 'Config dimuat ulang dari storage/default.'
 }
 
 const resetToDefault = () => {
@@ -171,6 +190,17 @@ const loadTemplate = () => {
   parseErrors.value = []
   statusMessage.value = 'Template default dimuat. Klik Simpan Config untuk commit.'
 }
+
+onMounted(async () => {
+  const fromFile = await loadConsolidationConfigFromFile()
+  if (!fromFile) {
+    return
+  }
+
+  config.value = fromFile
+  syncJsonFromConfig()
+  statusMessage.value = 'Config berhasil dimuat dari backend Odoo.'
+})
 
 const addEntity = () => {
   const next: ConsolidationEntity = {

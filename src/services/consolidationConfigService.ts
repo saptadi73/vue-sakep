@@ -1,7 +1,15 @@
 import defaultConfigJson from '@/reference/consolidation-config.json'
+import { fetchOdooJsonConfigByCode, upsertOdooJsonConfig } from '@/services/odooService'
 import type { ConsolidationConfig } from '@/types/consolidationConfig'
 
 const STORAGE_KEY = 'consolidation:config:v1'
+const ODOO_CONFIG_CODE = 'sakep_consolidated_report'
+const ODOO_CONFIG_NAME = 'SAKep Consolidated Report'
+
+export type SaveConsolidationConfigResult = {
+  mode: 'backend-and-storage' | 'storage-only'
+  error?: string
+}
 
 const cloneDefault = (): ConsolidationConfig => {
   return JSON.parse(JSON.stringify(defaultConfigJson)) as ConsolidationConfig
@@ -9,6 +17,14 @@ const cloneDefault = (): ConsolidationConfig => {
 
 export const getDefaultConsolidationConfig = (): ConsolidationConfig => {
   return cloneDefault()
+}
+
+const persistToStorage = (config: ConsolidationConfig) => {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(config, null, 2))
 }
 
 const mergeMissingDefaultEntities = (config: ConsolidationConfig): ConsolidationConfig => {
@@ -157,22 +173,77 @@ export const loadConsolidationConfig = (): ConsolidationConfig => {
     merged.coaMappings.length !== stored.coaMappings.length ||
     merged.reportTree.length !== stored.reportTree.length
   ) {
-    saveConsolidationConfig(merged)
+    persistToStorage(merged)
   }
 
   return merged
 }
 
-export const saveConsolidationConfig = (config: ConsolidationConfig) => {
+const normalizeAndPersistConfig = (config: ConsolidationConfig): ConsolidationConfig => {
+  const mergedEntities = mergeMissingDefaultEntities(config)
+  const mergedMappings = mergeMissingDefaultMappings(mergedEntities)
+  const merged = mergeMissingDefaultReportTree(mergedMappings)
+  persistToStorage(merged)
+  return merged
+}
+
+export const loadConsolidationConfigFromBackend = async (): Promise<ConsolidationConfig | null> => {
   if (typeof window === 'undefined') {
-    return
+    return null
   }
 
-  window.localStorage.setItem(STORAGE_KEY, JSON.stringify(config, null, 2))
+  try {
+    const record = await fetchOdooJsonConfigByCode(ODOO_CONFIG_CODE)
+    if (!record?.config) {
+      return null
+    }
+
+    const parsed = record.config as unknown
+    const errors = validateConsolidationConfig(parsed)
+    if (errors.length > 0) {
+      return null
+    }
+
+    return normalizeAndPersistConfig(parsed as ConsolidationConfig)
+  } catch {
+    return null
+  }
+}
+
+export const loadConsolidationConfigFromFile = loadConsolidationConfigFromBackend
+
+export const saveConsolidationConfig = async (
+  config: ConsolidationConfig,
+): Promise<SaveConsolidationConfigResult> => {
+  const normalized = normalizeAndPersistConfig(config)
+
+  if (typeof window === 'undefined') {
+    return {
+      mode: 'storage-only',
+      error: 'Window tidak tersedia untuk menyimpan config backend.',
+    }
+  }
+
+  try {
+    await upsertOdooJsonConfig({
+      name: ODOO_CONFIG_NAME,
+      code: ODOO_CONFIG_CODE,
+      sequence: 10,
+      config: normalized,
+    })
+
+    return { mode: 'backend-and-storage' }
+  } catch (error) {
+    return {
+      mode: 'storage-only',
+      error:
+        error instanceof Error ? error.message : 'Gagal menghubungi API backend untuk simpan config.',
+    }
+  }
 }
 
 export const resetConsolidationConfig = (): ConsolidationConfig => {
   const next = cloneDefault()
-  saveConsolidationConfig(next)
+  void saveConsolidationConfig(next)
   return next
 }

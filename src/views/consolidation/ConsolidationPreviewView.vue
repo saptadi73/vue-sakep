@@ -66,7 +66,7 @@ const copyDraftToClipboard = async () => {
   statusMessage.value = 'Clipboard API tidak tersedia. Silakan copy manual dari Export JSON config.'
 }
 
-const applySuggestionsToConfig = () => {
+const applySuggestionsToConfig = async () => {
   const config = loadConsolidationConfig()
   const existingKeys = new Set(
     config.coaMappings.map(
@@ -92,9 +92,12 @@ const applySuggestionsToConfig = () => {
     return
   }
 
-  saveConsolidationConfig(config)
+  const saveResult = await saveConsolidationConfig(config)
   recalculate()
-  statusMessage.value = `${added} suggestion berhasil ditambahkan ke config. Cek /consolidation/config untuk review.`
+  statusMessage.value =
+    saveResult.mode === 'backend-and-storage'
+      ? `${added} suggestion berhasil ditambahkan dan disimpan permanen ke backend Odoo. Cek /consolidation/config untuk review.`
+      : `${added} suggestion ditambahkan, tetapi saat ini hanya tersimpan di browser storage. ${saveResult.error ?? ''}`.trim()
 }
 </script>
 

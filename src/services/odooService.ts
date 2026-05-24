@@ -3,6 +3,8 @@ import type {
   OdooAuthPayload,
   OdooCompaniesPayload,
   OdooFinancialReportPayload,
+  OdooJsonConfigListPayload,
+  OdooJsonConfigRecord,
   OdooReportRequestParams,
   OdooRpcResponse,
   OdooTrialBalancePayload,
@@ -10,7 +12,9 @@ import type {
 } from '@/types/odoo'
 
 const SERVER_URL_STORAGE_KEY = 'odoo:server-url'
-const DEFAULT_API_BASE_URL = (import.meta.env.VITE_ODOO_API_BASE_URL ?? '').replace(/\/$/, '')
+const DEFAULT_API_BASE_URL = (
+  import.meta.env.VITE_ODOO_API_BASE_URL ?? import.meta.env.VITE_ODOO_BASE_URL ?? ''
+).replace(/\/$/, '')
 
 const normalizeServerUrl = (url: string) => url.trim().replace(/\/$/, '')
 
@@ -255,4 +259,134 @@ export const fetchOdooTrialBalance = async (
     rows: mapTrialBalanceLinesToRows(report.lines),
     metaCompanyName: report.meta?.company_name ?? '-',
   }
+}
+
+const asOdooConfigRecord = (value: unknown): OdooJsonConfigRecord | null => {
+  if (!value || typeof value !== 'object') {
+    return null
+  }
+
+  const raw = value as Partial<OdooJsonConfigRecord>
+  if (typeof raw.code !== 'string' || raw.code.trim() === '') {
+    return null
+  }
+
+  if (typeof raw.name !== 'string' || raw.name.trim() === '') {
+    return null
+  }
+
+  return {
+    id: typeof raw.id === 'number' ? raw.id : 0,
+    name: raw.name,
+    code: raw.code,
+    description: typeof raw.description === 'string' ? raw.description : null,
+    company_id: typeof raw.company_id === 'number' ? raw.company_id : null,
+    active: typeof raw.active === 'boolean' ? raw.active : true,
+    sequence: typeof raw.sequence === 'number' ? raw.sequence : 10,
+    config: raw.config,
+  }
+}
+
+const collectOdooConfigItems = (payload: unknown): OdooJsonConfigRecord[] => {
+  if (!payload || typeof payload !== 'object') {
+    return []
+  }
+
+  const root = payload as Record<string, unknown>
+  const fromItems = Array.isArray(root.items)
+    ? root.items.map(asOdooConfigRecord).filter((item): item is OdooJsonConfigRecord => !!item)
+    : []
+
+  if (fromItems.length > 0) {
+    return fromItems
+  }
+
+  const fromSingle = asOdooConfigRecord(root)
+  if (fromSingle) {
+    return [fromSingle]
+  }
+
+  const nestedCandidates = [root.item, root.record, root.config]
+  for (const candidate of nestedCandidates) {
+    const normalized = asOdooConfigRecord(candidate)
+    if (normalized) {
+      return [normalized]
+    }
+  }
+
+  return []
+}
+
+export const fetchOdooJsonConfigByCode = async (
+  code: string,
+): Promise<OdooJsonConfigRecord | null> => {
+  const payload = await postRpc<unknown, { code: string }>('/api/accounting/configs/get', { code })
+  const items = collectOdooConfigItems(payload)
+  return items[0] ?? null
+}
+
+export const listOdooJsonConfigs = async (
+  params: {
+    company_id?: number | null
+    search?: string
+    include_inactive?: boolean
+    include_config?: boolean
+    page?: number
+    limit?: number
+  } = {},
+): Promise<OdooJsonConfigListPayload> => {
+  const payload = await postRpc<unknown, typeof params>('/api/accounting/configs', params)
+  const root = payload && typeof payload === 'object' ? (payload as Record<string, unknown>) : {}
+
+  return {
+    items: collectOdooConfigItems(root),
+    total: typeof root.total === 'number' ? root.total : undefined,
+    page: typeof root.page === 'number' ? root.page : undefined,
+    limit: typeof root.limit === 'number' ? root.limit : undefined,
+  }
+}
+
+export const upsertOdooJsonConfig = async (params: {
+  name: string
+  code: string
+  description?: string
+  company_id?: number | null
+  sequence?: number
+  config: unknown
+}): Promise<OdooJsonConfigRecord | null> => {
+  const updatePayload = {
+    code: params.code,
+    config: params.config,
+    ...(typeof params.description === 'string' ? { description: params.description } : {}),
+    ...(typeof params.sequence === 'number' ? { sequence: params.sequence } : {}),
+    ...(typeof params.company_id === 'number' ? { company_id: params.company_id } : {}),
+  }
+
+  try {
+    const updated = await postRpc<unknown, typeof updatePayload>(
+      '/api/accounting/configs/update',
+      updatePayload,
+    )
+    const normalizedUpdated = collectOdooConfigItems(updated)[0]
+    if (normalizedUpdated) {
+      return normalizedUpdated
+    }
+  } catch {
+    // Fallback to create when config code does not exist yet.
+  }
+
+  const createPayload = {
+    name: params.name,
+    code: params.code,
+    company_id: params.company_id ?? null,
+    sequence: params.sequence ?? 10,
+    config: params.config,
+    ...(typeof params.description === 'string' ? { description: params.description } : {}),
+  }
+
+  const created = await postRpc<unknown, typeof createPayload>(
+    '/api/accounting/configs/create',
+    createPayload,
+  )
+  return collectOdooConfigItems(created)[0] ?? null
 }
