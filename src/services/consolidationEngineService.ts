@@ -26,6 +26,10 @@ import type {
 } from '@/types/consolidationResult'
 import type { ReportRow } from '@/types/report'
 
+export type ConsolidationSourceData = Partial<
+  Record<string, Partial<Record<ConsolidationSection, ReportRow[]>>>
+>
+
 const SOURCE_DATA: Record<string, Record<ConsolidationSection, ReportRow[]>> = {
   'pt-jar': {
     'balance-sheet': mockJarBalanceSheet,
@@ -43,6 +47,11 @@ const SOURCE_DATA: Record<string, Record<ConsolidationSection, ReportRow[]>> = {
     'trial-balance': mockUspsKanjabungTrialBalance,
   },
 }
+
+export const getStaticConsolidationRows = (
+  entityId: string,
+  section: ConsolidationSection,
+): ReportRow[] => SOURCE_DATA[entityId]?.[section] ?? []
 
 const parseAmount = (value: string | null | undefined): number => {
   if (!value) {
@@ -402,6 +411,7 @@ const buildMappingSuggestions = (
 export const buildConsolidationPreview = (
   section: ConsolidationSection,
   inputConfig?: ConsolidationConfig,
+  sourceOverrides: ConsolidationSourceData = {},
 ): ConsolidationPreviewResult => {
   const config = inputConfig ?? loadConsolidationConfig()
   const enabledEntities = config.entities.filter((entity) => entity.enabled)
@@ -412,7 +422,7 @@ export const buildConsolidationPreview = (
   const unmappedEntries: ConsolidationUnmappedEntry[] = []
 
   for (const entity of enabledEntities) {
-    const rows = SOURCE_DATA[entity.id]?.[section] ?? []
+    const rows = sourceOverrides[entity.id]?.[section] ?? SOURCE_DATA[entity.id]?.[section] ?? []
 
     let mappedCount = 0
     let unmappedCount = 0

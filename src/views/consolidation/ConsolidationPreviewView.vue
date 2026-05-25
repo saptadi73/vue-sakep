@@ -7,9 +7,16 @@ import {
   loadConsolidationConfigFromFile,
   saveConsolidationConfig,
 } from '@/services/consolidationConfigService'
+import {
+  fetchOdooCompaniesForConsolidation,
+  loadConsolidationSourceData,
+} from '@/services/consolidationSourceService'
+import { useOdooAuthStore } from '@/stores/odooAuth'
 import type { CoaMappingRule, ConsolidationConfig } from '@/types/consolidationConfig'
 import type { ConsolidationPreviewResult } from '@/types/consolidationResult'
 import type { ConsolidationSection } from '@/types/consolidationConfig'
+import type { ConsolidationSourceData } from '@/services/consolidationEngineService'
+import type { ReportRow } from '@/types/report'
 
 const sectionOptions: Array<{ label: string; value: ConsolidationSection }> = [
   { label: 'Profit & Loss', value: 'pnl' },
@@ -17,13 +24,44 @@ const sectionOptions: Array<{ label: string; value: ConsolidationSection }> = [
   { label: 'Trial Balance', value: 'trial-balance' },
 ]
 
+const authStore = useOdooAuthStore()
 const selectedSection = ref<ConsolidationSection>('pnl')
 const activeConfig = ref<ConsolidationConfig>(getDefaultConsolidationConfig())
 const result = ref<ConsolidationPreviewResult>(
   buildConsolidationPreview(selectedSection.value, activeConfig.value),
 )
+const sourceData = ref<ConsolidationSourceData>({})
 const statusMessage = ref('Memuat config aktif dari backend Odoo untuk preview.')
 const isLoading = ref(true)
+
+const getDefaultPeriodParams = () => {
+  const today = new Date()
+  const year = today.getFullYear()
+
+  return {
+    date_from: `${year}-01-01`,
+    date_to: today.toISOString().slice(0, 10),
+    target_move: 'posted' as const,
+  }
+}
+
+const buildPreviewWithLiveSources = async () => {
+  await authStore.ensureCompanies()
+  const companies =
+    authStore.companies.length > 0 ? authStore.companies : await fetchOdooCompaniesForConsolidation()
+  sourceData.value = await loadConsolidationSourceData(
+    activeConfig.value,
+    companies,
+    [selectedSection.value],
+    getDefaultPeriodParams(),
+  )
+
+  result.value = buildConsolidationPreview(
+    selectedSection.value,
+    activeConfig.value,
+    sourceData.value,
+  )
+}
 
 const loadActiveConfig = async () => {
   isLoading.value = true
@@ -31,10 +69,15 @@ const loadActiveConfig = async () => {
   try {
     const fromBackend = await loadConsolidationConfigFromFile()
     activeConfig.value = fromBackend ?? loadConsolidationConfig()
-    result.value = buildConsolidationPreview(selectedSection.value, activeConfig.value)
+    await buildPreviewWithLiveSources()
     statusMessage.value = fromBackend
       ? 'Preview dihitung dari config backend Odoo yang aktif.'
       : 'Backend Odoo tidak tersedia. Preview memakai template default.'
+  } catch (error) {
+    result.value = buildConsolidationPreview(selectedSection.value, activeConfig.value)
+    statusMessage.value = `Preview memakai data mock karena data Odoo gagal dimuat. ${
+      error instanceof Error ? error.message : ''
+    }`.trim()
   } finally {
     isLoading.value = false
   }
@@ -46,9 +89,20 @@ const formatMoney = (value: number) =>
     maximumFractionDigits: 2,
   }).format(value)
 
-const recalculate = () => {
-  result.value = buildConsolidationPreview(selectedSection.value, activeConfig.value)
-  statusMessage.value = 'Preview berhasil dihitung ulang menggunakan config aktif terbaru.'
+const recalculate = async () => {
+  isLoading.value = true
+
+  try {
+    await buildPreviewWithLiveSources()
+    statusMessage.value = 'Preview berhasil dihitung ulang menggunakan config aktif dan data Odoo.'
+  } catch (error) {
+    result.value = buildConsolidationPreview(selectedSection.value, activeConfig.value)
+    statusMessage.value = `Preview memakai data mock karena data Odoo gagal dimuat. ${
+      error instanceof Error ? error.message : ''
+    }`.trim()
+  } finally {
+    isLoading.value = false
+  }
 }
 
 const totalBefore = computed(() =>
@@ -61,6 +115,107 @@ const totalAfter = computed(() => result.value.rows.reduce((sum, row) => sum + r
 
 const topUnmapped = computed(() => result.value.unmappedEntries.slice(0, 20))
 const topSuggestions = computed(() => result.value.mappingSuggestions.slice(0, 30))
+
+const escapeRegex = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+const accountMatches = (pattern: string, account: string): boolean => {
+  const cleanPattern = pattern.trim()
+  const cleanAccount = account.trim()
+
+  if (!cleanPattern || !cleanAccount) {
+    return false
+  }
+
+  if (!cleanPattern.includes('*')) {
+    return cleanPattern === cleanAccount
+  }
+
+  const regex = new RegExp(`^${escapeRegex(cleanPattern).replace(/\\\*/g, '.*')}$`)
+  return regex.test(cleanAccount)
+}
+
+const formatDebugAmount = (row: ReportRow) => row.Amount ?? row.Amount1 ?? '-'
+
+const rowMatchesMapping = (mapping: CoaMappingRule, row: ReportRow): boolean => {
+  return (
+    accountMatches(mapping.sourceAccount, row.Account) &&
+    (!mapping.sourceDescriptionContains ||
+      row.Description.toLowerCase().includes(mapping.sourceDescriptionContains.toLowerCase()))
+  )
+}
+
+const debugEntities = computed(() => {
+  return activeConfig.value.entities
+    .filter((entity) => entity.enabled)
+    .map((entity) => {
+      const rows = sourceData.value[entity.id]?.[selectedSection.value] ?? []
+      const mappings = activeConfig.value.coaMappings.filter(
+        (mapping) => mapping.entityId === entity.id && mapping.section === selectedSection.value,
+      )
+      const targetMappings = mappings
+      const targetRows =
+        mappings.length > 0
+          ? rows.filter((row) =>
+              mappings.some((mapping) => accountMatches(mapping.sourceAccount, row.Account)),
+            )
+          : []
+      const matchedRows = mappings.flatMap((mapping) =>
+        rows
+          .filter((row) => rowMatchesMapping(mapping, row))
+          .slice(0, 8)
+          .map((row) => ({
+            mapping,
+            row,
+          })),
+      )
+
+      const missingTreeKeys = mappings
+        .map((mapping) => mapping.consolidationKey)
+        .filter(
+          (key, index, keys) =>
+            keys.indexOf(key) === index &&
+            !activeConfig.value.reportTree.some(
+              (node) => node.section === selectedSection.value && node.key === key,
+            ),
+      )
+      const hasRelevantUnmappedRows = result.value.unmappedEntries.some(
+        (entry) =>
+          entry.entityId === entity.id &&
+          mappings.some((mapping) => accountMatches(mapping.sourceAccount, entry.account)),
+      )
+      const warnings: string[] = []
+
+      if (entity.source === 'odoo' && rows.length === 0) {
+        warnings.push('Data Odoo untuk section ini belum termuat.')
+      }
+
+      if (mappings.length > 0 && rows.length > 0 && targetRows.length === 0) {
+        warnings.push('Mapping section ada, tetapi tidak ada source row yang match pola sourceAccount.')
+      }
+
+      if (
+        mappings.length > 0 &&
+        (targetRows.length > 0 || hasRelevantUnmappedRows) &&
+        matchedRows.length === 0
+      ) {
+        warnings.push('Mapping ada, tetapi tidak ada row source yang match sourceAccount.')
+      }
+
+      if (missingTreeKeys.length > 0) {
+        warnings.push(`Key ${missingTreeKeys.join(', ')} tidak ada di report tree section ini.`)
+      }
+
+      return {
+        entity,
+        rows,
+        mappings,
+        targetMappings,
+        targetRows: targetRows.slice(0, 12),
+        matchedRows,
+        warnings,
+      }
+    })
+})
 
 const mappingDrafts = computed<CoaMappingRule[]>(() => {
   return result.value.mappingSuggestions.map((item) => ({
@@ -117,7 +272,7 @@ const applySuggestionsToConfig = async () => {
   if (saveResult.mode === 'backend-and-storage') {
     activeConfig.value = config
   }
-  recalculate()
+  await recalculate()
   statusMessage.value =
     saveResult.mode === 'backend-and-storage'
       ? `${added} suggestion berhasil ditambahkan dan disimpan permanen ke backend Odoo. Cek /consolidation/config untuk review.`
@@ -203,6 +358,81 @@ onMounted(async () => {
               <td class="num">{{ formatMoney(row.amountBefore) }}</td>
               <td class="num">{{ formatMoney(row.eliminationAmount) }}</td>
               <td class="num">{{ formatMoney(row.amountAfter) }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section v-if="!isLoading" class="table-card">
+      <h2>Debug Source Mapping</h2>
+      <p class="status">
+        Section: {{ selectedSection }} | Odoo login:
+        {{ authStore.isAuthenticated ? 'aktif' : 'belum login' }} | Company Odoo:
+        {{ authStore.companies.length }}
+      </p>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Entity</th>
+              <th>Source</th>
+              <th>Rows Loaded</th>
+              <th>Mappings</th>
+              <th>Target Mapping</th>
+              <th>Source Rows Target Mapping</th>
+              <th>Matched Rows</th>
+              <th>Warnings</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="entry in debugEntities" :key="entry.entity.id">
+              <td>{{ entry.entity.id }}</td>
+              <td>{{ entry.entity.source }}</td>
+              <td>{{ entry.rows.length }}</td>
+              <td>{{ entry.mappings.length }}</td>
+              <td>
+                <div v-if="entry.targetMappings.length === 0" class="empty">-</div>
+                <div
+                  v-for="mapping in entry.targetMappings"
+                  :key="`${mapping.sourceAccount}-${mapping.consolidationKey}`"
+                  class="debug-line"
+                >
+                  {{ mapping.sourceAccount }} -> {{ mapping.consolidationKey }} ({{
+                    mapping.section
+                  }}, sign {{ mapping.sign ?? 1 }})
+                </div>
+              </td>
+              <td>
+                <div v-if="entry.targetRows.length === 0" class="empty">-</div>
+                <div
+                  v-for="row in entry.targetRows"
+                  :key="`${row.Account}-${row.Description}`"
+                  class="debug-line"
+                >
+                  {{ row.Account }} | {{ row.Description }} | {{ formatDebugAmount(row) }}
+                </div>
+              </td>
+              <td>
+                <div v-if="entry.matchedRows.length === 0" class="empty">-</div>
+                <div
+                  v-for="item in entry.matchedRows"
+                  :key="`${item.mapping.sourceAccount}-${item.row.Account}-${item.row.Description}`"
+                  class="debug-line"
+                >
+                  {{ item.row.Account }} | {{ item.row.Description }} |
+                  {{ formatDebugAmount(item.row) }}
+                </div>
+              </td>
+              <td>
+                <div v-if="entry.mappings.length === 0" class="muted-text">
+                  Tidak ada mapping section ini.
+                </div>
+                <div v-else-if="entry.warnings.length === 0" class="ok-text">OK</div>
+                <div v-for="warning in entry.warnings" :key="warning" class="warning-text">
+                  {{ warning }}
+                </div>
+              </td>
             </tr>
           </tbody>
         </table>
@@ -498,6 +728,31 @@ th {
 .empty {
   text-align: center;
   color: #74593a;
+}
+
+.debug-line {
+  min-width: 260px;
+  margin: 0.1rem 0;
+  font-size: 0.8rem;
+  line-height: 1.35;
+  color: #1f2937;
+}
+
+.warning-text {
+  min-width: 220px;
+  margin: 0.1rem 0;
+  color: #9a3412;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.ok-text {
+  color: #166534;
+  font-weight: 700;
+}
+
+.muted-text {
+  color: #64748b;
 }
 
 @media (max-width: 960px) {

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onBeforeUnmount, onMounted, ref } from 'vue'
+import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
 import {
   getDefaultConsolidationConfig,
   loadConsolidationConfig,
@@ -8,6 +8,12 @@ import {
   saveConsolidationConfig,
   validateConsolidationConfig,
 } from '@/services/consolidationConfigService'
+import {
+  fetchOdooCompaniesForConsolidation,
+  findOdooCompanyForEntity,
+  loadConsolidationSourceData,
+} from '@/services/consolidationSourceService'
+import { useOdooAuthStore } from '@/stores/odooAuth'
 import type {
   CoaMappingRule,
   ConsolidationConfig,
@@ -16,13 +22,21 @@ import type {
   ConsolidationSection,
   EliminationRule,
 } from '@/types/consolidationConfig'
+import type { ConsolidationSourceData } from '@/services/consolidationEngineService'
+import type { ReportRow } from '@/types/report'
 
+const authStore = useOdooAuthStore()
 const config = ref<ConsolidationConfig>(getDefaultConsolidationConfig())
 const jsonText = ref(JSON.stringify(config.value, null, 2))
 const statusMessage = ref('Memuat config dari backend Odoo...')
 const parseErrors = ref<string[]>([])
 const editorMode = ref<'table' | 'json'>('table')
 const isLoading = ref(true)
+const isDebugLoading = ref(false)
+const debugSection = ref<ConsolidationSection>('balance-sheet')
+const debugSourceData = ref<ConsolidationSourceData>({})
+const debugCompanies = ref(authStore.companies)
+const debugStatusMessage = ref('Menunggu config selesai dimuat untuk cek data source.')
 const activeSourceLabel = ref('backend Odoo')
 const activeSourceTone = ref<'backend' | 'fallback' | 'template'>('backend')
 const toastMessage = ref('')
@@ -99,6 +113,158 @@ const eliminationKeyOptionsBySection = computed<Record<ConsolidationSection, str
 const getEliminationKeyOptions = (section: ConsolidationSection): string[] => {
   return eliminationKeyOptionsBySection.value[section] ?? []
 }
+
+const getDefaultDebugPeriodParams = () => {
+  const today = new Date()
+  const year = today.getFullYear()
+
+  return {
+    date_from: `${year}-01-01`,
+    date_to: today.toISOString().slice(0, 10),
+    target_move: 'posted' as const,
+  }
+}
+
+const escapeRegex = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+const accountMatches = (pattern: string, account: string): boolean => {
+  const cleanPattern = pattern.trim()
+  const cleanAccount = account.trim()
+
+  if (!cleanPattern || !cleanAccount) {
+    return false
+  }
+
+  if (!cleanPattern.includes('*')) {
+    return cleanPattern === cleanAccount
+  }
+
+  const regex = new RegExp(`^${escapeRegex(cleanPattern).replace(/\\\*/g, '.*')}$`)
+  return regex.test(cleanAccount)
+}
+
+const formatDebugAmount = (row: ReportRow) => row.Amount ?? row.Amount1 ?? '-'
+
+const rowMatchesMapping = (mapping: CoaMappingRule, row: ReportRow): boolean => {
+  return (
+    accountMatches(mapping.sourceAccount, row.Account) &&
+    (!mapping.sourceDescriptionContains ||
+      row.Description.toLowerCase().includes(mapping.sourceDescriptionContains.toLowerCase()))
+  )
+}
+
+const runSourceDebug = async (mode: 'auto' | 'manual' = 'manual') => {
+  isDebugLoading.value = true
+  debugStatusMessage.value = 'Mengambil data source...'
+
+  try {
+    await authStore.ensureCompanies()
+    debugCompanies.value = authStore.companies
+    if (debugCompanies.value.length === 0) {
+      debugCompanies.value = await fetchOdooCompaniesForConsolidation()
+    }
+
+    debugSourceData.value = await loadConsolidationSourceData(
+      config.value,
+      debugCompanies.value,
+      [debugSection.value],
+      getDefaultDebugPeriodParams(),
+    )
+    debugStatusMessage.value =
+      mode === 'auto'
+        ? 'Data source berhasil dimuat otomatis untuk debug config.'
+        : 'Data source berhasil dimuat ulang untuk debug config.'
+  } catch (error) {
+    debugSourceData.value = {}
+    debugStatusMessage.value = `Gagal memuat data source. ${
+      error instanceof Error ? error.message : ''
+    }`.trim()
+  } finally {
+    isDebugLoading.value = false
+  }
+}
+
+const debugEntities = computed(() => {
+  return config.value.entities
+    .filter((entity) => entity.enabled)
+    .map((entity) => {
+      const company =
+        entity.source === 'odoo' ? findOdooCompanyForEntity(entity.id, debugCompanies.value) : null
+      const rows = debugSourceData.value[entity.id]?.[debugSection.value] ?? []
+      const mappings = config.value.coaMappings.filter(
+        (mapping) => mapping.entityId === entity.id && mapping.section === debugSection.value,
+      )
+      const targetMappings = mappings
+      const targetRows =
+        mappings.length > 0
+          ? rows.filter((row) =>
+              mappings.some((mapping) => accountMatches(mapping.sourceAccount, row.Account)),
+            )
+          : []
+      const matchedRows = mappings.flatMap((mapping) =>
+        rows
+          .filter((row) => rowMatchesMapping(mapping, row))
+          .slice(0, 12)
+          .map((row) => ({
+            mapping,
+            row,
+          })),
+      )
+      const missingTreeKeys = mappings
+        .map((mapping) => mapping.consolidationKey)
+        .filter(
+          (key, index, keys) =>
+            keys.indexOf(key) === index &&
+            !config.value.reportTree.some(
+              (node) => node.section === debugSection.value && node.key === key,
+            ),
+        )
+      const hasRelevantSourceRows = targetRows.length > 0
+      const hasTargetMappings = mappings.length > 0
+      const hasMatchedRows = matchedRows.length > 0
+      const hasMappingsButNoRows = hasTargetMappings && rows.length > 0 && !hasRelevantSourceRows
+      const hasRowsButNoMatch = hasTargetMappings && hasRelevantSourceRows && !hasMatchedRows
+      const hasRelevantUnmappedRows = rows.some((row) =>
+        mappings.some((mapping) => accountMatches(mapping.sourceAccount, row.Account)),
+      )
+      const warnings: string[] = []
+
+      if (entity.source === 'odoo' && !company) {
+        warnings.push('Company Odoo untuk entity ini tidak terdeteksi.')
+      }
+
+      if (entity.source === 'odoo' && company && rows.length === 0) {
+        warnings.push('Company Odoo terdeteksi, tetapi rows source untuk section ini kosong.')
+      }
+
+      if (entity.source !== 'odoo' && rows.length === 0) {
+        warnings.push('Rows source static/mock untuk section ini kosong.')
+      }
+
+      if (hasMappingsButNoRows) {
+        warnings.push('Mapping target ada, tetapi rows source untuk pola sourceAccount itu tidak ditemukan.')
+      }
+
+      if (hasRowsButNoMatch || (hasTargetMappings && hasRelevantUnmappedRows && !hasMatchedRows)) {
+        warnings.push('Source rows ada dan mapping ada, tetapi pola sourceAccount tidak match.')
+      }
+
+      if (missingTreeKeys.length > 0) {
+        warnings.push(`Key ${missingTreeKeys.join(', ')} tidak ada di report tree section ini.`)
+      }
+
+      return {
+        entity,
+        company,
+        rows,
+        mappings,
+        targetMappings,
+        targetRows: targetRows.slice(0, 16),
+        matchedRows,
+        warnings,
+      }
+    })
+})
 
 const syncJsonFromConfig = () => {
   jsonText.value = JSON.stringify(config.value, null, 2)
@@ -189,6 +355,7 @@ const loadBackendFirst = async () => {
     statusMessage.value = fromFile
       ? 'Config terbaru dimuat dari backend Odoo yang terkonfirmasi.'
       : 'Backend Odoo tidak tersedia, config fallback ke template default.'
+    await runSourceDebug('auto')
   } finally {
     isLoading.value = false
   }
@@ -251,6 +418,14 @@ const loadTemplate = () => {
 
 onMounted(async () => {
   await loadBackendFirst()
+})
+
+watch(debugSection, async () => {
+  if (isLoading.value) {
+    return
+  }
+
+  await runSourceDebug('auto')
 })
 
 onBeforeUnmount(() => {
@@ -489,6 +664,126 @@ const updateEliminationNote = (row: EliminationRule, event: Event) => {
           <li>Bangun reportTree untuk struktur final laporan konsolidasi.</li>
           <li>Definisikan eliminationRules untuk transaksi antar entitas (intercompany).</li>
         </ol>
+      </section>
+
+      <section class="source-debug-card">
+        <div class="debug-head">
+          <div>
+            <h2>Debug Data Source</h2>
+            <p class="debug-subtitle">
+              Cek apakah row sumber sudah tercapture dan match dengan mapping aktif.
+            </p>
+          </div>
+          <div class="debug-actions">
+            <label class="debug-field">
+              Section
+              <select v-model="debugSection">
+                <option value="balance-sheet">balance-sheet</option>
+                <option value="pnl">pnl</option>
+                <option value="trial-balance">trial-balance</option>
+              </select>
+            </label>
+            <button
+              type="button"
+              class="btn primary"
+              :disabled="isDebugLoading"
+              @click="runSourceDebug()"
+            >
+              {{ isDebugLoading ? 'Mengecek...' : 'Re-check Data Source' }}
+            </button>
+          </div>
+        </div>
+
+        <p class="status">
+          {{ debugStatusMessage }} Login Odoo:
+          {{ authStore.isAuthenticated ? 'aktif' : 'belum login' }} | Company Odoo:
+          {{ debugCompanies.length }}
+        </p>
+        <p class="status">
+          Daftar company:
+          {{
+            debugCompanies.length
+              ? debugCompanies.map((company) => `${company.name} (#${company.id})`).join(', ')
+              : '-'
+          }}
+        </p>
+
+        <div class="sheet-scroll">
+          <table class="sheet-table debug-table">
+            <thead>
+              <tr>
+                <th>Entity</th>
+                <th>Source Info</th>
+                <th>Rows Loaded</th>
+                <th>Mapping Section</th>
+                <th>Target Mapping</th>
+                <th>Source Rows Target Mapping</th>
+                <th>Matched Rows</th>
+                <th>Warnings</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr v-if="debugEntities.length === 0">
+                <td colspan="8" class="empty-cell">
+                  Tidak ada entity aktif di config.
+                </td>
+              </tr>
+              <tr v-for="entry in debugEntities" :key="entry.entity.id">
+                <td>{{ entry.entity.id }}</td>
+                <td>
+                  <span v-if="entry.company">
+                    {{ entry.company.name }} (#{{ entry.company.id }})
+                  </span>
+                  <span v-else>{{ entry.entity.source }}</span>
+                </td>
+                <td>{{ entry.rows.length }}</td>
+                <td>{{ entry.mappings.length }}</td>
+                <td>
+                  <div v-if="entry.targetMappings.length === 0" class="muted-text">-</div>
+                  <div
+                    v-for="mapping in entry.targetMappings"
+                    :key="`${entry.entity.id}-${mapping.sourceAccount}-${mapping.consolidationKey}`"
+                    class="debug-line"
+                  >
+                    {{ mapping.sourceAccount }} -> {{ mapping.consolidationKey }} ({{
+                      mapping.section
+                    }}, sign {{ mapping.sign ?? 1 }})
+                  </div>
+                </td>
+                <td>
+                  <div v-if="entry.targetRows.length === 0" class="muted-text">-</div>
+                  <div
+                    v-for="row in entry.targetRows"
+                    :key="`${entry.entity.id}-${row.Account}-${row.Description}`"
+                    class="debug-line"
+                  >
+                    {{ row.Account }} | {{ row.Description }} | {{ formatDebugAmount(row) }}
+                  </div>
+                </td>
+                <td>
+                  <div v-if="entry.matchedRows.length === 0" class="muted-text">-</div>
+                  <div
+                    v-for="item in entry.matchedRows"
+                    :key="`${entry.entity.id}-${item.mapping.sourceAccount}-${item.row.Account}-${item.row.Description}`"
+                    class="debug-line"
+                  >
+                    {{ item.row.Account }} | {{ item.row.Description }} |
+                    {{ formatDebugAmount(item.row) }}
+                  </div>
+                </td>
+                <td>
+                  <div v-if="entry.mappings.length === 0" class="muted-text">
+                    Tidak ada mapping section ini.
+                  </div>
+                  <div v-else-if="entry.warnings.length === 0" class="ok-text">OK</div>
+                  <div v-for="warning in entry.warnings" :key="warning" class="warning-text">
+                    {{ warning }}
+                  </div>
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
       </section>
 
       <section class="editor-card">
@@ -1046,6 +1341,7 @@ h1 {
 }
 
 .help-card,
+.source-debug-card,
 .editor-card {
   border-radius: 14px;
   border: 1px solid rgba(11, 45, 82, 0.13);
@@ -1062,6 +1358,89 @@ h1 {
   margin: 0;
   padding-left: 1rem;
   color: #30465e;
+}
+
+.source-debug-card {
+  display: grid;
+  gap: 0.7rem;
+}
+
+.debug-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  align-items: end;
+}
+
+.debug-head h2 {
+  margin: 0;
+  font-size: 1rem;
+  color: #163b61;
+}
+
+.debug-subtitle {
+  margin: 0.25rem 0 0;
+  color: #52677f;
+  font-size: 0.9rem;
+}
+
+.debug-actions {
+  display: flex;
+  align-items: end;
+  gap: 0.55rem;
+  flex-wrap: wrap;
+}
+
+.debug-field {
+  display: grid;
+  gap: 0.25rem;
+  min-width: 180px;
+  color: #35516f;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.debug-field select {
+  min-height: 34px;
+  border-radius: 9px;
+  border: 1px solid rgba(13, 58, 101, 0.32);
+  background: #fff;
+  padding: 0 0.5rem;
+  font: inherit;
+}
+
+.debug-table td {
+  vertical-align: top;
+}
+
+.debug-line {
+  min-width: 260px;
+  margin: 0.1rem 0;
+  color: #1f2937;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.warning-text {
+  min-width: 220px;
+  margin: 0.1rem 0;
+  color: #9a3412;
+  font-size: 0.8rem;
+  line-height: 1.35;
+}
+
+.ok-text {
+  color: #166534;
+  font-weight: 700;
+}
+
+.muted-text,
+.empty-cell {
+  color: #64748b;
+}
+
+.empty-cell {
+  text-align: center;
 }
 
 .toolbar {

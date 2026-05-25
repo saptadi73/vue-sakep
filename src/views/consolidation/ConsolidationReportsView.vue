@@ -6,6 +6,11 @@ import {
   loadConsolidationConfig,
   loadConsolidationConfigFromFile,
 } from '@/services/consolidationConfigService'
+import {
+  fetchOdooCompaniesForConsolidation,
+  loadConsolidationSourceData,
+} from '@/services/consolidationSourceService'
+import { useOdooAuthStore } from '@/stores/odooAuth'
 import { exportMultiSheetExcel } from '@/utils/excelExport'
 import type { ConsolidationConfig } from '@/types/consolidationConfig'
 import type { ConsolidationPreviewResult } from '@/types/consolidationResult'
@@ -32,6 +37,7 @@ const months = [
   { value: 12, label: 'Desember' },
 ]
 
+const authStore = useOdooAuthStore()
 const selectedYear = ref(currentYear)
 const selectedMonth = ref(currentMonth)
 const periodLabel = computed(() => {
@@ -51,18 +57,51 @@ const tbResult = ref<ConsolidationPreviewResult | null>(null)
 
 const activeTab = ref<'balance-sheet' | 'pnl' | 'trial-balance'>('balance-sheet')
 
+const getReportPeriodParams = () => {
+  const lastDayOfMonth = new Date(selectedYear.value, selectedMonth.value, 0).getDate()
+  const month = String(selectedMonth.value).padStart(2, '0')
+
+  return {
+    date_from: `${selectedYear.value}-01-01`,
+    date_to: `${selectedYear.value}-${month}-${String(lastDayOfMonth).padStart(2, '0')}`,
+    target_move: 'posted' as const,
+  }
+}
+
 const generateReports = async () => {
   isGenerating.value = true
 
   try {
     const fromBackend = await loadConsolidationConfigFromFile()
     activeConfig.value = fromBackend ?? loadConsolidationConfig()
+    await authStore.ensureCompanies()
+    const companies =
+      authStore.companies.length > 0
+        ? authStore.companies
+        : await fetchOdooCompaniesForConsolidation()
+
+    const sourceData = await loadConsolidationSourceData(
+      activeConfig.value,
+      companies,
+      ['pnl', 'balance-sheet', 'trial-balance'],
+      getReportPeriodParams(),
+    )
+
+    pnlResult.value = buildConsolidationPreview('pnl', activeConfig.value, sourceData)
+    bsResult.value = buildConsolidationPreview('balance-sheet', activeConfig.value, sourceData)
+    tbResult.value = buildConsolidationPreview('trial-balance', activeConfig.value, sourceData)
+    generationStatus.value = fromBackend
+      ? 'Laporan dihitung dari config backend Odoo yang aktif dan data Odoo live.'
+      : 'Backend Odoo tidak tersedia. Laporan dihitung dari template default dan data Odoo live.'
+    isGenerated.value = true
+    activeTab.value = 'balance-sheet'
+  } catch (error) {
     pnlResult.value = buildConsolidationPreview('pnl', activeConfig.value)
     bsResult.value = buildConsolidationPreview('balance-sheet', activeConfig.value)
     tbResult.value = buildConsolidationPreview('trial-balance', activeConfig.value)
-    generationStatus.value = fromBackend
-      ? 'Laporan dihitung dari config backend Odoo yang aktif.'
-      : 'Backend Odoo tidak tersedia. Laporan dihitung dari template default.'
+    generationStatus.value = `Laporan memakai data mock karena data Odoo gagal dimuat. ${
+      error instanceof Error ? error.message : ''
+    }`.trim()
     isGenerated.value = true
     activeTab.value = 'balance-sheet'
   } finally {

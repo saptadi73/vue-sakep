@@ -74,6 +74,19 @@ const toAmountString = (value: number | undefined | null) => {
   return decimalFormatter.format(value)
 }
 
+const splitLeadingAccountCode = (name: string): { account: string; description: string } | null => {
+  const match = name.trim().match(/^(\d+(?:\.\d+)*)(?:\s+|-+\s*)(.+)$/)
+
+  if (!match) {
+    return null
+  }
+
+  return {
+    account: match[1] ?? '',
+    description: match[2]?.trim() ?? name,
+  }
+}
+
 const asRecord = (value: unknown): Record<string, unknown> | null => {
   if (!value || typeof value !== 'object') {
     return null
@@ -190,12 +203,17 @@ const mapFinancialLinesToRows = (lines: OdooFinancialReportPayload['lines']): Re
     return []
   }
 
-  return lines.map((line) => ({
-    Account: String(line.code ?? ''),
-    Description: line.name,
-    Amount: toAmountString(line.balance),
-    PadLeft: line.level ? Math.max(0, line.level - 1) : 0,
-  }))
+  return lines.map((line) => {
+    const accountFromCode = String(line.code ?? '').trim()
+    const accountFromName = splitLeadingAccountCode(line.name)
+
+    return {
+      Account: accountFromCode || accountFromName?.account || '',
+      Description: accountFromName?.description ?? line.name,
+      Amount: toAmountString(line.balance),
+      PadLeft: line.level ? Math.max(0, line.level - 1) : 0,
+    }
+  })
 }
 
 const mapTrialBalanceLinesToRows = (lines: OdooTrialBalancePayload['lines']): ReportRow[] => {
