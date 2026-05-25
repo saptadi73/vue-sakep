@@ -1,4 +1,23 @@
 import type { ConsolidationLineType, ConsolidationSection } from '@/types/consolidationConfig'
+import type { ReportRow } from '@/types/report'
+
+export type ConsolidationSourceStatus = 'live' | 'mock' | 'static' | 'empty' | 'error' | 'missing'
+
+export interface ConsolidationSourceEntry {
+  rows: ReportRow[]
+  status: ConsolidationSourceStatus
+  sourceLabel: string
+  note?: string
+  periodLabel?: string
+  requestedPeriod?: string
+  error?: string
+}
+
+export type ConsolidationSourceSectionData = ReportRow[] | ConsolidationSourceEntry
+
+export type ConsolidationSourceData = Partial<
+  Record<string, Partial<Record<ConsolidationSection, ConsolidationSourceSectionData>>>
+>
 
 export interface ConsolidationPreviewRow {
   key: string
@@ -14,6 +33,10 @@ export interface ConsolidationPreviewRow {
 
 export interface ConsolidationSourceSummary {
   entityId: string
+  status: ConsolidationSourceStatus
+  sourceLabel: string
+  note?: string
+  periodLabel?: string
   rowCount: number
   mappedCount: number
   unmappedCount: number

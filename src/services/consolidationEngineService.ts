@@ -22,14 +22,14 @@ import type {
   ConsolidationMappingSuggestion,
   ConsolidationPreviewResult,
   ConsolidationPreviewRow,
+  ConsolidationSourceData,
+  ConsolidationSourceEntry,
   ConsolidationSourceSummary,
   ConsolidationUnmappedEntry,
 } from '@/types/consolidationResult'
 import type { ReportRow } from '@/types/report'
 
-export type ConsolidationSourceData = Partial<
-  Record<string, Partial<Record<ConsolidationSection, ReportRow[]>>>
->
+export type { ConsolidationSourceData, ConsolidationSourceEntry } from '@/types/consolidationResult'
 
 const SOURCE_DATA: Record<string, Record<ConsolidationSection, ReportRow[]>> = {
   'pt-jar': {
@@ -53,6 +53,39 @@ export const getStaticConsolidationRows = (
   entityId: string,
   section: ConsolidationSection,
 ): ReportRow[] => SOURCE_DATA[entityId]?.[section] ?? []
+
+export const getConsolidationSourceEntry = (
+  sourceData: ConsolidationSourceData,
+  entityId: string,
+  section: ConsolidationSection,
+): ConsolidationSourceEntry => {
+  const value = sourceData[entityId]?.[section]
+
+  if (Array.isArray(value)) {
+    return {
+      rows: value,
+      status: value.length > 0 ? 'live' : 'empty',
+      sourceLabel: 'legacy rows',
+    }
+  }
+
+  if (value) {
+    return value
+  }
+
+  return {
+    rows: [],
+    status: 'missing',
+    sourceLabel: 'not loaded',
+    note: 'Source data belum dimuat untuk entity/section ini.',
+  }
+}
+
+export const getConsolidationSourceRows = (
+  sourceData: ConsolidationSourceData,
+  entityId: string,
+  section: ConsolidationSection,
+): ReportRow[] => getConsolidationSourceEntry(sourceData, entityId, section).rows
 
 const parseAmount = (value: string | null | undefined): number => {
   if (!value) {
@@ -512,7 +545,8 @@ export const buildConsolidationPreview = (
   const unmappedEntries: ConsolidationUnmappedEntry[] = []
 
   for (const entity of enabledEntities) {
-    const rows = sourceOverrides[entity.id]?.[section] ?? SOURCE_DATA[entity.id]?.[section] ?? []
+    const sourceEntry = getConsolidationSourceEntry(sourceOverrides, entity.id, section)
+    const rows = sourceEntry.rows
     const entityAmountByKey: Record<string, number> = {}
     mappedAmountByEntityKey[entity.id] = entityAmountByKey
 
@@ -556,6 +590,10 @@ export const buildConsolidationPreview = (
 
     sourceSummary.push({
       entityId: entity.id,
+      status: sourceEntry.status,
+      sourceLabel: sourceEntry.sourceLabel,
+      note: sourceEntry.note ?? sourceEntry.error,
+      periodLabel: sourceEntry.periodLabel,
       rowCount: rows.length,
       mappedCount,
       unmappedCount,

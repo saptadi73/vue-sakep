@@ -1,6 +1,9 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { buildConsolidationPreview } from '@/services/consolidationEngineService'
+import {
+  buildConsolidationPreview,
+  getConsolidationSourceEntry,
+} from '@/services/consolidationEngineService'
 import {
   getDefaultConsolidationConfig,
   loadConsolidationConfig,
@@ -74,8 +77,8 @@ const loadActiveConfig = async () => {
       ? 'Preview dihitung dari config backend Odoo yang aktif.'
       : 'Backend Odoo tidak tersedia. Preview memakai template default.'
   } catch (error) {
-    result.value = buildConsolidationPreview(selectedSection.value, activeConfig.value)
-    statusMessage.value = `Preview memakai data mock karena data Odoo gagal dimuat. ${
+    result.value = buildConsolidationPreview(selectedSection.value, activeConfig.value, sourceData.value)
+    statusMessage.value = `Preview gagal memuat sebagian/semua source live. Data mock tidak dipakai otomatis. ${
       error instanceof Error ? error.message : ''
     }`.trim()
   } finally {
@@ -96,8 +99,8 @@ const recalculate = async () => {
     await buildPreviewWithLiveSources()
     statusMessage.value = 'Preview berhasil dihitung ulang menggunakan config aktif dan data Odoo.'
   } catch (error) {
-    result.value = buildConsolidationPreview(selectedSection.value, activeConfig.value)
-    statusMessage.value = `Preview memakai data mock karena data Odoo gagal dimuat. ${
+    result.value = buildConsolidationPreview(selectedSection.value, activeConfig.value, sourceData.value)
+    statusMessage.value = `Preview gagal memuat sebagian/semua source live. Data mock tidak dipakai otomatis. ${
       error instanceof Error ? error.message : ''
     }`.trim()
   } finally {
@@ -148,7 +151,12 @@ const debugEntities = computed(() => {
   return activeConfig.value.entities
     .filter((entity) => entity.enabled)
     .map((entity) => {
-      const rows = sourceData.value[entity.id]?.[selectedSection.value] ?? []
+      const sourceEntry = getConsolidationSourceEntry(
+        sourceData.value,
+        entity.id,
+        selectedSection.value,
+      )
+      const rows = sourceEntry.rows
       const mappings = activeConfig.value.coaMappings.filter(
         (mapping) => mapping.entityId === entity.id && mapping.section === selectedSection.value,
       )
@@ -189,6 +197,12 @@ const debugEntities = computed(() => {
         warnings.push('Data Odoo untuk section ini belum termuat.')
       }
 
+      if (sourceEntry.status !== 'live') {
+        warnings.push(
+          `Source status ${sourceEntry.status}: ${sourceEntry.note ?? sourceEntry.error ?? sourceEntry.sourceLabel}`,
+        )
+      }
+
       if (mappings.length > 0 && rows.length > 0 && targetRows.length === 0) {
         warnings.push('Mapping section ada, tetapi tidak ada source row yang match pola sourceAccount.')
       }
@@ -207,6 +221,7 @@ const debugEntities = computed(() => {
 
       return {
         entity,
+        sourceEntry,
         rows,
         mappings,
         targetMappings,
@@ -377,6 +392,8 @@ onMounted(async () => {
             <tr>
               <th>Entity</th>
               <th>Source</th>
+              <th>Source Status</th>
+              <th>Period Used</th>
               <th>Rows Loaded</th>
               <th>Mappings</th>
               <th>Target Mapping</th>
@@ -389,6 +406,12 @@ onMounted(async () => {
             <tr v-for="entry in debugEntities" :key="entry.entity.id">
               <td>{{ entry.entity.id }}</td>
               <td>{{ entry.entity.source }}</td>
+              <td>
+                <span :class="entry.sourceEntry.status === 'live' ? 'ok-text' : 'warning-text'">
+                  {{ entry.sourceEntry.status }}
+                </span>
+              </td>
+              <td>{{ entry.sourceEntry.periodLabel ?? '-' }}</td>
               <td>{{ entry.rows.length }}</td>
               <td>{{ entry.mappings.length }}</td>
               <td>
@@ -518,19 +541,31 @@ onMounted(async () => {
           <thead>
             <tr>
               <th>Entity</th>
+              <th>Status</th>
+              <th>Source</th>
+              <th>Period</th>
               <th>Rows</th>
               <th>Mapped</th>
               <th>Unmapped</th>
               <th>Mapped Amount</th>
+              <th>Note</th>
             </tr>
           </thead>
           <tbody>
             <tr v-for="source in result.sourceSummary" :key="source.entityId">
               <td>{{ source.entityId }}</td>
+              <td>
+                <span :class="source.status === 'live' ? 'ok-text' : 'warning-text'">
+                  {{ source.status }}
+                </span>
+              </td>
+              <td>{{ source.sourceLabel }}</td>
+              <td>{{ source.periodLabel ?? '-' }}</td>
               <td>{{ source.rowCount }}</td>
               <td>{{ source.mappedCount }}</td>
               <td>{{ source.unmappedCount }}</td>
               <td class="num">{{ formatMoney(source.totalMappedAmount) }}</td>
+              <td>{{ source.note ?? '-' }}</td>
             </tr>
           </tbody>
         </table>

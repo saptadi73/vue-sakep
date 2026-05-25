@@ -24,7 +24,10 @@ import type {
   ConsolidationSection,
   EliminationRule,
 } from '@/types/consolidationConfig'
-import type { ConsolidationSourceData } from '@/services/consolidationEngineService'
+import {
+  getConsolidationSourceEntry,
+  type ConsolidationSourceData,
+} from '@/services/consolidationEngineService'
 import type { ReportRow } from '@/types/report'
 
 const authStore = useOdooAuthStore()
@@ -292,10 +295,18 @@ const debugEntities = computed(() => {
     .map((entity) => {
       const company =
         entity.source === 'odoo' ? findOdooCompanyForEntity(entity.id, debugCompanies.value) : null
-      const rows = debugSourceData.value[entity.id]?.[debugSection.value] ?? []
+      const sourceEntry = getConsolidationSourceEntry(
+        debugSourceData.value,
+        entity.id,
+        debugSection.value,
+      )
+      const rows = sourceEntry.rows
       const mappings = config.value.coaMappings.filter(
         (mapping) => mapping.entityId === entity.id && mapping.section === debugSection.value,
       )
+      const mappingsOtherSectionCount = config.value.coaMappings.filter(
+        (mapping) => mapping.entityId === entity.id && mapping.section !== debugSection.value,
+      ).length
       const targetMappings = mappings
       const targetRows =
         mappings.length > 0
@@ -332,6 +343,11 @@ const debugEntities = computed(() => {
           const source = mapping.sourceAccount.trim()
           return source === '5*' || source === '6*'
         })
+      const looksLikeUsppsMockRows =
+        entity.id === 'pt-uspps-kanjabung' &&
+        rows.length >= 25 &&
+        rows.some((row) => row.Account === '1101') &&
+        rows.some((row) => row.Account === '1201')
       const hasRelevantUnmappedRows = rows.some((row) =>
         mappings.some((mapping) => accountMatches(mapping.sourceAccount, row.Account)),
       )
@@ -347,6 +363,12 @@ const debugEntities = computed(() => {
 
       if (entity.source !== 'odoo' && rows.length === 0) {
         warnings.push('Rows source static/mock untuk section ini kosong.')
+      }
+
+      if (sourceEntry.status !== 'live') {
+        warnings.push(
+          `Source status ${sourceEntry.status}: ${sourceEntry.note ?? sourceEntry.error ?? sourceEntry.sourceLabel}`,
+        )
       }
 
       if (hasMappingsButNoRows) {
@@ -365,6 +387,12 @@ const debugEntities = computed(() => {
         )
       }
 
+      if (looksLikeUsppsMockRows) {
+        warnings.push(
+          'Data source USPPS terdeteksi memakai pola mock (mis. akun 1101/1201). Mapping akun 1013xxx tidak akan match sebelum source kembali live.',
+        )
+      }
+
       if (missingTreeKeys.length > 0) {
         warnings.push(`Key ${missingTreeKeys.join(', ')} tidak ada di report tree section ini.`)
       }
@@ -372,8 +400,10 @@ const debugEntities = computed(() => {
       return {
         entity,
         company,
+        sourceEntry,
         rows,
         mappings,
+        mappingsOtherSectionCount,
         targetMappings,
         targetRows: targetRows.slice(0, 16),
         matchedRows,
@@ -1148,6 +1178,8 @@ const updateEliminationNote = (row: EliminationRule, event: Event) => {
               <tr>
                 <th>Entity</th>
                 <th>Source Info</th>
+                <th>Source Status</th>
+                <th>Period Used</th>
                 <th>Rows Loaded</th>
                 <th>Mapping Section</th>
                 <th>Target Mapping</th>
@@ -1158,7 +1190,7 @@ const updateEliminationNote = (row: EliminationRule, event: Event) => {
             </thead>
             <tbody>
               <tr v-if="debugEntities.length === 0">
-                <td colspan="8" class="empty-cell">Tidak ada entity aktif di config.</td>
+                <td colspan="10" class="empty-cell">Tidak ada entity aktif di config.</td>
               </tr>
               <tr v-for="entry in debugEntities" :key="entry.entity.id">
                 <td>{{ entry.entity.id }}</td>
@@ -1168,6 +1200,12 @@ const updateEliminationNote = (row: EliminationRule, event: Event) => {
                   </span>
                   <span v-else>{{ entry.entity.source }}</span>
                 </td>
+                <td>
+                  <span :class="entry.sourceEntry.status === 'live' ? 'ok-text' : 'warning-text'">
+                    {{ entry.sourceEntry.status }}
+                  </span>
+                </td>
+                <td>{{ entry.sourceEntry.periodLabel ?? '-' }}</td>
                 <td>{{ entry.rows.length }}</td>
                 <td>{{ entry.mappings.length }}</td>
                 <td>
@@ -1205,7 +1243,10 @@ const updateEliminationNote = (row: EliminationRule, event: Event) => {
                 </td>
                 <td>
                   <div v-if="entry.mappings.length === 0" class="muted-text">
-                    Tidak ada mapping section ini.
+                    Tidak ada mapping untuk section {{ debugSection }}.
+                    <span v-if="entry.mappingsOtherSectionCount > 0">
+                      (Ada {{ entry.mappingsOtherSectionCount }} mapping di section lain.)
+                    </span>
                   </div>
                   <div v-else-if="entry.warnings.length === 0" class="ok-text">OK</div>
                   <div v-for="warning in entry.warnings" :key="warning" class="warning-text">

@@ -91,15 +91,15 @@ const generateReports = async () => {
     bsResult.value = buildConsolidationPreview('balance-sheet', activeConfig.value, sourceData)
     tbResult.value = buildConsolidationPreview('trial-balance', activeConfig.value, sourceData)
     generationStatus.value = fromBackend
-      ? 'Laporan dihitung dari config backend Odoo yang aktif dan data Odoo live.'
-      : 'Backend Odoo tidak tersedia. Laporan dihitung dari template default dan data Odoo live.'
+      ? 'Laporan dihitung dari config backend Odoo yang aktif dan source data terverifikasi per entity.'
+      : 'Backend Odoo tidak tersedia. Laporan dihitung dari template default dan source data terverifikasi per entity.'
     isGenerated.value = true
     activeTab.value = 'balance-sheet'
   } catch (error) {
-    pnlResult.value = buildConsolidationPreview('pnl', activeConfig.value)
-    bsResult.value = buildConsolidationPreview('balance-sheet', activeConfig.value)
-    tbResult.value = buildConsolidationPreview('trial-balance', activeConfig.value)
-    generationStatus.value = `Laporan memakai data mock karena data Odoo gagal dimuat. ${
+    pnlResult.value = buildConsolidationPreview('pnl', activeConfig.value, {})
+    bsResult.value = buildConsolidationPreview('balance-sheet', activeConfig.value, {})
+    tbResult.value = buildConsolidationPreview('trial-balance', activeConfig.value, {})
+    generationStatus.value = `Laporan gagal memuat source live. Data mock tidak dipakai otomatis. ${
       error instanceof Error ? error.message : ''
     }`.trim()
     isGenerated.value = true
@@ -129,6 +129,16 @@ const activeRows = computed(() => {
   if (activeTab.value === 'pnl') return pnlResult.value?.rows ?? []
   return tbResult.value?.rows ?? []
 })
+
+const activeResult = computed(() => {
+  if (activeTab.value === 'balance-sheet') return bsResult.value
+  if (activeTab.value === 'pnl') return pnlResult.value
+  return tbResult.value
+})
+
+const activeSourceIssues = computed(() =>
+  (activeResult.value?.sourceSummary ?? []).filter((source) => source.status !== 'live'),
+)
 
 const activeTitle = computed(() => {
   if (activeTab.value === 'balance-sheet') return 'Neraca (Balance Sheet)'
@@ -270,6 +280,14 @@ const exportXls = () => {
             <h2 class="report-title">{{ activeTitle }}</h2>
           </div>
           <p class="report-subtitle">Laporan Konsolidasi — Multi-Entitas (Setelah Eliminasi)</p>
+        </div>
+
+        <div v-if="activeSourceIssues.length > 0" class="source-alert">
+          <strong>Source data belum sepenuhnya live.</strong>
+          <div v-for="source in activeSourceIssues" :key="source.entityId" class="source-alert-line">
+            {{ source.entityId }}: {{ source.status }} | {{ source.sourceLabel }} |
+            {{ source.periodLabel ?? '-' }} | {{ source.note ?? '-' }}
+          </div>
         </div>
 
         <table class="report-table">
@@ -518,6 +536,21 @@ const exportXls = () => {
   border-collapse: collapse;
   font-size: 0.88rem;
 }
+
+.source-alert {
+  margin: 0 0 0.8rem;
+  border: 1px solid #f2b8a0;
+  border-radius: 8px;
+  background: #fff7ed;
+  color: #9a3412;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.82rem;
+}
+
+.source-alert-line {
+  margin-top: 0.25rem;
+}
+
 .report-table thead th {
   padding: 0.55rem 0.7rem;
   background: #0e2b52;
