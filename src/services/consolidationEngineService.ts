@@ -18,6 +18,7 @@ import type {
 } from '@/types/consolidationConfig'
 import type {
   ConsolidationEliminationEntry,
+  ConsolidationEliminationRuleResult,
   ConsolidationMappingSuggestion,
   ConsolidationPreviewResult,
   ConsolidationPreviewRow,
@@ -186,22 +187,81 @@ const applyEliminations = (
   config: ConsolidationConfig,
   section: ConsolidationSection,
   beforeMap: Record<string, number>,
+  beforeMapByEntity: Record<string, Record<string, number>>,
 ): {
   eliminationByKey: Record<string, number>
   eliminations: ConsolidationEliminationEntry[]
+  ruleResults: ConsolidationEliminationRuleResult[]
 } => {
   const eliminationByKey: Record<string, number> = {}
   const eliminations: ConsolidationEliminationEntry[] = []
+  const ruleResults: ConsolidationEliminationRuleResult[] = []
 
   for (const rule of config.eliminationRules) {
-    if (!rule.enabled || rule.section !== section) {
+    if (rule.section !== section) {
       continue
     }
 
-    const debitValue = beforeMap[rule.debitKey] ?? 0
-    const creditValue = beforeMap[rule.creditKey] ?? 0
+    if (!rule.enabled) {
+      ruleResults.push({
+        ruleId: rule.id,
+        ruleName: rule.name,
+        enabled: rule.enabled,
+        scope: rule.scope,
+        entityPair: rule.entityPair,
+        debitKey: rule.debitKey,
+        creditKey: rule.creditKey,
+        debitValue: 0,
+        creditValue: 0,
+        amount: 0,
+        applied: false,
+        reason: 'Rule disabled.',
+      })
+      continue
+    }
+
+    let debitValue = beforeMap[rule.debitKey] ?? 0
+    let creditValue = beforeMap[rule.creditKey] ?? 0
+
+    if (rule.scope === 'entity-pair') {
+      const [debitEntityId, creditEntityId] = rule.entityPair ?? []
+      if (!debitEntityId || !creditEntityId) {
+        ruleResults.push({
+          ruleId: rule.id,
+          ruleName: rule.name,
+          enabled: rule.enabled,
+          scope: rule.scope,
+          entityPair: rule.entityPair,
+          debitKey: rule.debitKey,
+          creditKey: rule.creditKey,
+          debitValue: 0,
+          creditValue: 0,
+          amount: 0,
+          applied: false,
+          reason: 'Entity pair belum lengkap.',
+        })
+        continue
+      }
+
+      debitValue = beforeMapByEntity[debitEntityId]?.[rule.debitKey] ?? 0
+      creditValue = beforeMapByEntity[creditEntityId]?.[rule.creditKey] ?? 0
+    }
 
     if (debitValue === 0 || creditValue === 0) {
+      ruleResults.push({
+        ruleId: rule.id,
+        ruleName: rule.name,
+        enabled: rule.enabled,
+        scope: rule.scope,
+        entityPair: rule.entityPair,
+        debitKey: rule.debitKey,
+        creditKey: rule.creditKey,
+        debitValue,
+        creditValue,
+        amount: 0,
+        applied: false,
+        reason: 'Debit key atau credit key bernilai 0.',
+      })
       continue
     }
 
@@ -210,6 +270,20 @@ const applyEliminations = (
     const amount = baseAmount * pct
 
     if (amount === 0) {
+      ruleResults.push({
+        ruleId: rule.id,
+        ruleName: rule.name,
+        enabled: rule.enabled,
+        scope: rule.scope,
+        entityPair: rule.entityPair,
+        debitKey: rule.debitKey,
+        creditKey: rule.creditKey,
+        debitValue,
+        creditValue,
+        amount,
+        applied: false,
+        reason: 'Amount eliminasi 0.',
+      })
       continue
     }
 
@@ -226,9 +300,24 @@ const applyEliminations = (
       creditKey: rule.creditKey,
       amount,
     })
+
+    ruleResults.push({
+      ruleId: rule.id,
+      ruleName: rule.name,
+      enabled: rule.enabled,
+      scope: rule.scope,
+      entityPair: rule.entityPair,
+      debitKey: rule.debitKey,
+      creditKey: rule.creditKey,
+      debitValue,
+      creditValue,
+      amount,
+      applied: true,
+      reason: 'Applied.',
+    })
   }
 
-  return { eliminationByKey, eliminations }
+  return { eliminationByKey, eliminations, ruleResults }
 }
 
 const findFirstExistingKey = (candidates: string[], availableKeys: Set<string>): string | null => {
@@ -418,11 +507,14 @@ export const buildConsolidationPreview = (
   const sectionMappings = config.coaMappings.filter((mapping) => mapping.section === section)
 
   const mappedAmountByKey: Record<string, number> = {}
+  const mappedAmountByEntityKey: Record<string, Record<string, number>> = {}
   const sourceSummary: ConsolidationSourceSummary[] = []
   const unmappedEntries: ConsolidationUnmappedEntry[] = []
 
   for (const entity of enabledEntities) {
     const rows = sourceOverrides[entity.id]?.[section] ?? SOURCE_DATA[entity.id]?.[section] ?? []
+    const entityAmountByKey: Record<string, number> = {}
+    mappedAmountByEntityKey[entity.id] = entityAmountByKey
 
     let mappedCount = 0
     let unmappedCount = 0
@@ -456,6 +548,8 @@ export const buildConsolidationPreview = (
       const signedAmount = rawAmount * (mapping.sign ?? 1)
       mappedAmountByKey[mapping.consolidationKey] =
         (mappedAmountByKey[mapping.consolidationKey] ?? 0) + signedAmount
+      entityAmountByKey[mapping.consolidationKey] =
+        (entityAmountByKey[mapping.consolidationKey] ?? 0) + signedAmount
       mappedCount += 1
       totalMappedAmount += signedAmount
     }
@@ -471,7 +565,18 @@ export const buildConsolidationPreview = (
 
   const treeNodes = config.reportTree.filter((node) => node.section === section)
   const beforeTree = computeTreeValues(treeNodes, mappedAmountByKey)
-  const { eliminationByKey, eliminations } = applyEliminations(config, section, beforeTree)
+  const beforeTreeByEntity = Object.fromEntries(
+    Object.entries(mappedAmountByEntityKey).map(([entityId, entityMap]) => [
+      entityId,
+      computeTreeValues(treeNodes, entityMap),
+    ]),
+  )
+  const { eliminationByKey, eliminations, ruleResults } = applyEliminations(
+    config,
+    section,
+    beforeTree,
+    beforeTreeByEntity,
+  )
 
   const afterBase: Record<string, number> = { ...mappedAmountByKey }
   for (const [key, adjustment] of Object.entries(eliminationByKey)) {
@@ -506,6 +611,7 @@ export const buildConsolidationPreview = (
     rows,
     sourceSummary,
     eliminations,
+    eliminationRuleResults: ruleResults,
     unmappedEntries,
     mappingSuggestions,
   }

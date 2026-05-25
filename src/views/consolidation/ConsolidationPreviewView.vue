@@ -467,6 +467,51 @@ onMounted(async () => {
     </section>
 
     <section v-if="!isLoading" class="table-card">
+      <h2>Elimination Rule Debug</h2>
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Rule</th>
+              <th>Scope</th>
+              <th>Entity Pair</th>
+              <th>Debit Key</th>
+              <th>Debit Value</th>
+              <th>Credit Key</th>
+              <th>Credit Value</th>
+              <th>Amount</th>
+              <th>Status</th>
+              <th>Reason</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-if="result.eliminationRuleResults.length === 0">
+              <td colspan="10" class="empty">
+                Tidak ada rule eliminasi untuk section ini.
+              </td>
+            </tr>
+            <tr v-for="rule in result.eliminationRuleResults" :key="rule.ruleId">
+              <td>{{ rule.ruleName }}</td>
+              <td>{{ rule.scope }}</td>
+              <td>{{ rule.entityPair?.join(' -> ') ?? '-' }}</td>
+              <td>{{ rule.debitKey }}</td>
+              <td class="num">{{ formatMoney(rule.debitValue) }}</td>
+              <td>{{ rule.creditKey }}</td>
+              <td class="num">{{ formatMoney(rule.creditValue) }}</td>
+              <td class="num">{{ formatMoney(rule.amount) }}</td>
+              <td>
+                <span :class="rule.applied ? 'ok-text' : 'warning-text'">
+                  {{ rule.applied ? 'Applied' : 'Skipped' }}
+                </span>
+              </td>
+              <td>{{ rule.reason }}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <section v-if="!isLoading" class="table-card">
       <h2>Source Summary</h2>
       <div class="table-wrap">
         <table>

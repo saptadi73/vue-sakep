@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onBeforeUnmount, onMounted, ref, watch } from 'vue'
+import * as XLSX from 'xlsx'
 import {
   getDefaultConsolidationConfig,
   loadConsolidationConfig,
@@ -14,6 +15,7 @@ import {
   loadConsolidationSourceData,
 } from '@/services/consolidationSourceService'
 import { useOdooAuthStore } from '@/stores/odooAuth'
+import { exportToExcel } from '@/utils/excelExport'
 import type {
   CoaMappingRule,
   ConsolidationConfig,
@@ -42,6 +44,106 @@ const activeSourceTone = ref<'backend' | 'fallback' | 'template'>('backend')
 const toastMessage = ref('')
 const toastVisible = ref(false)
 let toastTimer: number | undefined
+
+type SpreadsheetImportTarget = 'coaMappings' | 'reportTree' | 'eliminationRules'
+
+const spreadsheetTemplates: Record<
+  SpreadsheetImportTarget,
+  {
+    label: string
+    fileName: string
+    sheetName: string
+    columns: string[]
+    sampleRows: Record<string, string | number | boolean>[]
+  }
+> = {
+  coaMappings: {
+    label: 'COA Mappings',
+    fileName: 'template-coa-mappings',
+    sheetName: 'COA Mappings',
+    columns: [
+      'entityId',
+      'sourceAccount',
+      'sourceDescriptionContains',
+      'consolidationKey',
+      'section',
+      'parentKey',
+      'lineType',
+      'sign',
+      'note',
+    ],
+    sampleRows: [
+      {
+        entityId: 'kan-jabung',
+        sourceAccount: '101.0104*',
+        sourceDescriptionContains: '',
+        consolidationKey: 'deposito',
+        section: 'balance-sheet',
+        parentKey: 'current_assets',
+        lineType: 'detail',
+        sign: 1,
+        note: 'Contoh mapping deposito',
+      },
+    ],
+  },
+  reportTree: {
+    label: 'Report Tree',
+    fileName: 'template-report-tree',
+    sheetName: 'Report Tree',
+    columns: ['key', 'section', 'label', 'lineType', 'parentKey', 'order', 'formula'],
+    sampleRows: [
+      {
+        key: 'deposito',
+        section: 'balance-sheet',
+        label: 'Deposito',
+        lineType: 'detail',
+        parentKey: 'current_assets',
+        order: 112,
+        formula: '',
+      },
+    ],
+  },
+  eliminationRules: {
+    label: 'Elimination Rules',
+    fileName: 'template-elimination-rules',
+    sheetName: 'Elimination Rules',
+    columns: [
+      'id',
+      'name',
+      'enabled',
+      'section',
+      'debitKey',
+      'creditKey',
+      'scope',
+      'entityPairLeft',
+      'entityPairRight',
+      'method',
+      'percentage',
+      'note',
+    ],
+    sampleRows: [
+      {
+        id: 'elim-ic-sales-cogs',
+        name: 'Eliminasi Penjualan Antar Entitas',
+        enabled: true,
+        section: 'pnl',
+        debitKey: 'rev_external',
+        creditKey: 'cogs',
+        scope: 'all',
+        entityPairLeft: '',
+        entityPairRight: '',
+        method: 'percentage',
+        percentage: 100,
+        note: 'Contoh eliminasi',
+      },
+    ],
+  },
+}
+
+const validSections: ConsolidationSection[] = ['balance-sheet', 'pnl', 'trial-balance']
+const validLineTypes = ['header', 'detail', 'subtotal', 'total', 'derived'] as const
+const validScopes = ['all', 'entity-pair'] as const
+const validMethods = ['full', 'percentage'] as const
 
 const hideToast = () => {
   toastVisible.value = false
@@ -389,6 +491,324 @@ const fileInputRef = ref<HTMLInputElement | null>(null)
 
 const triggerImport = () => {
   fileInputRef.value?.click()
+}
+
+const spreadsheetInputRef = ref<HTMLInputElement | null>(null)
+const spreadsheetImportTarget = ref<SpreadsheetImportTarget>('coaMappings')
+
+const triggerSpreadsheetImport = (target: SpreadsheetImportTarget) => {
+  spreadsheetImportTarget.value = target
+  spreadsheetInputRef.value?.click()
+}
+
+const downloadSpreadsheetTemplate = (target: SpreadsheetImportTarget) => {
+  const template = spreadsheetTemplates[target]
+  const rows = template.sampleRows.map((row) => {
+    return Object.fromEntries(template.columns.map((column) => [column, row[column] ?? '']))
+  })
+
+  exportToExcel(rows, template.sheetName, template.fileName)
+}
+
+const toCellText = (value: unknown) => String(value ?? '').trim()
+
+const parseBooleanCell = (value: unknown): boolean | null => {
+  if (typeof value === 'boolean') return value
+  const text = toCellText(value).toLowerCase()
+  if (['true', '1', 'yes', 'y', 'aktif', 'enabled'].includes(text)) return true
+  if (['false', '0', 'no', 'n', 'nonaktif', 'disabled'].includes(text)) return false
+  return null
+}
+
+const parseNumberCell = (value: unknown): number | null => {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  const normalized = toCellText(value).replace(/\./g, '').replace(',', '.')
+  if (!normalized) return null
+  const parsed = Number(normalized)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
+const getSpreadsheetRows = async (file: File): Promise<Record<string, unknown>[]> => {
+  const buffer = await file.arrayBuffer()
+  const workbook = XLSX.read(buffer, { type: 'array' })
+  const sheetName = workbook.SheetNames[0]
+  if (!sheetName) {
+    throw new Error('File tidak memiliki sheet.')
+  }
+
+  const worksheet = workbook.Sheets[sheetName]
+  if (!worksheet) {
+    throw new Error('Sheet pertama tidak dapat dibaca.')
+  }
+
+  return XLSX.utils.sheet_to_json<Record<string, unknown>>(worksheet, {
+    defval: '',
+    raw: false,
+  })
+}
+
+const validateSpreadsheetColumns = (
+  target: SpreadsheetImportTarget,
+  rows: Record<string, unknown>[],
+): string[] => {
+  const errors: string[] = []
+  const expectedColumns = spreadsheetTemplates[target].columns
+  const actualColumns = new Set(rows.flatMap((row) => Object.keys(row).map((key) => key.trim())))
+  const missingColumns = expectedColumns.filter((column) => !actualColumns.has(column))
+
+  if (missingColumns.length > 0) {
+    errors.push(`Kolom wajib belum ada: ${missingColumns.join(', ')}.`)
+  }
+
+  return errors
+}
+
+const normalizeSpreadsheetRows = (rows: Record<string, unknown>[]) => {
+  return rows
+    .map((row) =>
+      Object.fromEntries(Object.entries(row).map(([key, value]) => [key.trim(), value])) as Record<
+        string,
+        unknown
+      >,
+    )
+    .filter((row) => Object.values(row).some((value) => toCellText(value) !== ''))
+}
+
+const buildCoaMappingsFromRows = (
+  rows: Record<string, unknown>[],
+): { items: CoaMappingRule[]; errors: string[] } => {
+  const errors = validateSpreadsheetColumns('coaMappings', rows)
+  const entityIds = new Set(config.value.entities.map((entity) => entity.id))
+  const treeKeys = new Set(
+    config.value.reportTree.map((node) => `${node.section}|${node.key}`),
+  )
+  const items: CoaMappingRule[] = []
+
+  rows.forEach((row, index) => {
+    const line = index + 2
+    const entityId = toCellText(row.entityId)
+    const sourceAccount = toCellText(row.sourceAccount)
+    const consolidationKey = toCellText(row.consolidationKey)
+    const section = toCellText(row.section) as ConsolidationSection
+    const parentKey = toCellText(row.parentKey)
+    const lineTypeText = toCellText(row.lineType) || 'detail'
+    const signNumber = parseNumberCell(row.sign)
+
+    if (!entityId) errors.push(`Baris ${line}: entityId wajib diisi.`)
+    if (entityId && !entityIds.has(entityId)) {
+      errors.push(`Baris ${line}: entityId "${entityId}" belum ada di tabel Entities.`)
+    }
+    if (!sourceAccount) errors.push(`Baris ${line}: sourceAccount wajib diisi.`)
+    if (!consolidationKey) errors.push(`Baris ${line}: consolidationKey wajib diisi.`)
+    if (!validSections.includes(section)) {
+      errors.push(`Baris ${line}: section harus salah satu ${validSections.join(', ')}.`)
+    }
+    if (!validLineTypes.includes(lineTypeText as (typeof validLineTypes)[number])) {
+      errors.push(`Baris ${line}: lineType tidak valid.`)
+    }
+    if (signNumber !== 1 && signNumber !== -1) {
+      errors.push(`Baris ${line}: sign harus 1 atau -1.`)
+    }
+    if (section && consolidationKey && !treeKeys.has(`${section}|${consolidationKey}`)) {
+      errors.push(
+        `Baris ${line}: consolidationKey "${consolidationKey}" belum ada di Report Tree section ${section}.`,
+      )
+    }
+
+    items.push({
+      entityId,
+      sourceAccount,
+      sourceDescriptionContains: toCellText(row.sourceDescriptionContains) || undefined,
+      consolidationKey,
+      section,
+      parentKey: parentKey || undefined,
+      lineType: lineTypeText as CoaMappingRule['lineType'],
+      sign: signNumber as 1 | -1,
+      note: toCellText(row.note) || undefined,
+    })
+  })
+
+  return { items, errors }
+}
+
+const buildReportTreeFromRows = (
+  rows: Record<string, unknown>[],
+): { items: ConsolidationNode[]; errors: string[] } => {
+  const errors = validateSpreadsheetColumns('reportTree', rows)
+  const items: ConsolidationNode[] = []
+  const seenKeys = new Set<string>()
+
+  rows.forEach((row, index) => {
+    const line = index + 2
+    const key = toCellText(row.key)
+    const section = toCellText(row.section) as ConsolidationSection
+    const label = toCellText(row.label)
+    const lineType = toCellText(row.lineType)
+    const parentKey = toCellText(row.parentKey)
+    const order = parseNumberCell(row.order)
+    const dedupeKey = `${section}|${key}`
+
+    if (!key) errors.push(`Baris ${line}: key wajib diisi.`)
+    if (key && seenKeys.has(dedupeKey)) errors.push(`Baris ${line}: key "${key}" duplikat.`)
+    seenKeys.add(dedupeKey)
+    if (!validSections.includes(section)) {
+      errors.push(`Baris ${line}: section harus salah satu ${validSections.join(', ')}.`)
+    }
+    if (!label) errors.push(`Baris ${line}: label wajib diisi.`)
+    if (!validLineTypes.includes(lineType as (typeof validLineTypes)[number])) {
+      errors.push(`Baris ${line}: lineType tidak valid.`)
+    }
+    if (order === null) errors.push(`Baris ${line}: order wajib berupa angka.`)
+
+    items.push({
+      key,
+      section,
+      label,
+      lineType: lineType as ConsolidationNode['lineType'],
+      parentKey: parentKey || undefined,
+      order: order ?? 0,
+      formula: toCellText(row.formula) || undefined,
+    })
+  })
+
+  const treeKeys = new Set(items.map((item) => `${item.section}|${item.key}`))
+  items.forEach((item, index) => {
+    if (item.parentKey && !treeKeys.has(`${item.section}|${item.parentKey}`)) {
+      errors.push(
+        `Baris ${index + 2}: parentKey "${item.parentKey}" tidak ditemukan di section ${item.section}.`,
+      )
+    }
+  })
+
+  return { items, errors }
+}
+
+const buildEliminationRulesFromRows = (
+  rows: Record<string, unknown>[],
+): { items: EliminationRule[]; errors: string[] } => {
+  const errors = validateSpreadsheetColumns('eliminationRules', rows)
+  const entityIds = new Set(config.value.entities.map((entity) => entity.id))
+  const treeKeys = new Set(
+    config.value.reportTree.map((node) => `${node.section}|${node.key}`),
+  )
+  const items: EliminationRule[] = []
+
+  rows.forEach((row, index) => {
+    const line = index + 2
+    const id = toCellText(row.id)
+    const name = toCellText(row.name)
+    const enabled = parseBooleanCell(row.enabled)
+    const section = toCellText(row.section) as ConsolidationSection
+    const debitKey = toCellText(row.debitKey)
+    const creditKey = toCellText(row.creditKey)
+    const scope = toCellText(row.scope)
+    const method = toCellText(row.method)
+    const percentage = parseNumberCell(row.percentage)
+    const entityPairLeft = toCellText(row.entityPairLeft)
+    const entityPairRight = toCellText(row.entityPairRight)
+
+    if (!id) errors.push(`Baris ${line}: id wajib diisi.`)
+    if (!name) errors.push(`Baris ${line}: name wajib diisi.`)
+    if (enabled === null) errors.push(`Baris ${line}: enabled harus true/false.`)
+    if (!validSections.includes(section)) {
+      errors.push(`Baris ${line}: section harus salah satu ${validSections.join(', ')}.`)
+    }
+    if (!debitKey) errors.push(`Baris ${line}: debitKey wajib diisi.`)
+    if (!creditKey) errors.push(`Baris ${line}: creditKey wajib diisi.`)
+    if (section && debitKey && !treeKeys.has(`${section}|${debitKey}`)) {
+      errors.push(`Baris ${line}: debitKey "${debitKey}" tidak ada di Report Tree ${section}.`)
+    }
+    if (section && creditKey && !treeKeys.has(`${section}|${creditKey}`)) {
+      errors.push(`Baris ${line}: creditKey "${creditKey}" tidak ada di Report Tree ${section}.`)
+    }
+    if (!validScopes.includes(scope as (typeof validScopes)[number])) {
+      errors.push(`Baris ${line}: scope harus all atau entity-pair.`)
+    }
+    if (!validMethods.includes(method as (typeof validMethods)[number])) {
+      errors.push(`Baris ${line}: method harus full atau percentage.`)
+    }
+    if (method === 'percentage' && (percentage === null || percentage < 0 || percentage > 100)) {
+      errors.push(`Baris ${line}: percentage harus angka 0 sampai 100.`)
+    }
+    if (scope === 'entity-pair') {
+      if (!entityPairLeft || !entityPairRight) {
+        errors.push(`Baris ${line}: entityPairLeft dan entityPairRight wajib untuk scope entity-pair.`)
+      }
+      if (entityPairLeft && !entityIds.has(entityPairLeft)) {
+        errors.push(`Baris ${line}: entityPairLeft "${entityPairLeft}" belum ada di Entities.`)
+      }
+      if (entityPairRight && !entityIds.has(entityPairRight)) {
+        errors.push(`Baris ${line}: entityPairRight "${entityPairRight}" belum ada di Entities.`)
+      }
+    }
+
+    items.push({
+      id,
+      name,
+      enabled: enabled ?? false,
+      section,
+      debitKey,
+      creditKey,
+      scope: scope as EliminationRule['scope'],
+      entityPair:
+        scope === 'entity-pair' ? [entityPairLeft, entityPairRight] : undefined,
+      method: method as EliminationRule['method'],
+      percentage: method === 'percentage' ? (percentage ?? 0) : undefined,
+      note: toCellText(row.note) || undefined,
+    })
+  })
+
+  return { items, errors }
+}
+
+const importSpreadsheetRows = (target: SpreadsheetImportTarget, rows: Record<string, unknown>[]) => {
+  if (target === 'coaMappings') {
+    const { items, errors } = buildCoaMappingsFromRows(rows)
+    if (errors.length > 0) return errors
+    config.value.coaMappings = items
+  } else if (target === 'reportTree') {
+    const { items, errors } = buildReportTreeFromRows(rows)
+    if (errors.length > 0) return errors
+    config.value.reportTree = items
+  } else {
+    const { items, errors } = buildEliminationRulesFromRows(rows)
+    if (errors.length > 0) return errors
+    config.value.eliminationRules = items
+  }
+
+  return []
+}
+
+const importSpreadsheetFile = async (event: Event) => {
+  const input = event.target as HTMLInputElement
+  const file = input.files?.[0]
+  if (!file) return
+
+  try {
+    const rows = normalizeSpreadsheetRows(await getSpreadsheetRows(file))
+    if (rows.length === 0) {
+      parseErrors.value = ['File template tidak berisi data.']
+      statusMessage.value = 'Import spreadsheet gagal.'
+      return
+    }
+
+    const errors = importSpreadsheetRows(spreadsheetImportTarget.value, rows)
+    if (errors.length > 0) {
+      parseErrors.value = errors
+      statusMessage.value = `Import ${spreadsheetTemplates[spreadsheetImportTarget.value].label} gagal. Perbaiki file lalu upload ulang.`
+      return
+    }
+
+    parseErrors.value = []
+    syncJsonFromConfig()
+    statusMessage.value = `Import ${spreadsheetTemplates[spreadsheetImportTarget.value].label} berhasil diterapkan ke draft. Klik Simpan Config untuk commit.`
+    await runSourceDebug('auto')
+  } catch (error) {
+    parseErrors.value = [error instanceof Error ? error.message : 'File spreadsheet gagal dibaca.']
+    statusMessage.value = 'Import spreadsheet gagal.'
+  } finally {
+    input.value = ''
+  }
 }
 
 const importConfigFile = async (event: Event) => {
@@ -822,6 +1242,13 @@ const updateEliminationNote = (row: EliminationRule, event: Event) => {
           class="file-input"
           @change="importConfigFile"
         />
+        <input
+          ref="spreadsheetInputRef"
+          type="file"
+          accept=".xlsx,.xls,.csv"
+          class="file-input"
+          @change="importSpreadsheetFile"
+        />
 
         <p class="status">{{ statusMessage }}</p>
         <p v-if="!isLoading" class="source-badge" :class="`source-${activeSourceTone}`">
@@ -890,7 +1317,19 @@ const updateEliminationNote = (row: EliminationRule, event: Event) => {
           <article class="sheet-card">
             <div class="sheet-head">
               <h3>COA Mappings</h3>
-              <button type="button" class="btn" @click="addMapping">Tambah Baris</button>
+              <div class="sheet-actions">
+                <button
+                  type="button"
+                  class="btn"
+                  @click="downloadSpreadsheetTemplate('coaMappings')"
+                >
+                  Download Template
+                </button>
+                <button type="button" class="btn" @click="triggerSpreadsheetImport('coaMappings')">
+                  Upload XLS/CSV
+                </button>
+                <button type="button" class="btn" @click="addMapping">Tambah Baris</button>
+              </div>
             </div>
             <div class="sheet-scroll">
               <table class="sheet-table">
@@ -989,7 +1428,19 @@ const updateEliminationNote = (row: EliminationRule, event: Event) => {
           <article class="sheet-card">
             <div class="sheet-head">
               <h3>Report Tree</h3>
-              <button type="button" class="btn" @click="addTreeNode">Tambah Baris</button>
+              <div class="sheet-actions">
+                <button
+                  type="button"
+                  class="btn"
+                  @click="downloadSpreadsheetTemplate('reportTree')"
+                >
+                  Download Template
+                </button>
+                <button type="button" class="btn" @click="triggerSpreadsheetImport('reportTree')">
+                  Upload XLS/CSV
+                </button>
+                <button type="button" class="btn" @click="addTreeNode">Tambah Baris</button>
+              </div>
             </div>
             <div class="sheet-scroll">
               <table class="sheet-table">
@@ -1060,7 +1511,23 @@ const updateEliminationNote = (row: EliminationRule, event: Event) => {
           <article class="sheet-card">
             <div class="sheet-head">
               <h3>Elimination Rules</h3>
-              <button type="button" class="btn" @click="addEliminationRule">Tambah Baris</button>
+              <div class="sheet-actions">
+                <button
+                  type="button"
+                  class="btn"
+                  @click="downloadSpreadsheetTemplate('eliminationRules')"
+                >
+                  Download Template
+                </button>
+                <button
+                  type="button"
+                  class="btn"
+                  @click="triggerSpreadsheetImport('eliminationRules')"
+                >
+                  Upload XLS/CSV
+                </button>
+                <button type="button" class="btn" @click="addEliminationRule">Tambah Baris</button>
+              </div>
             </div>
             <div class="sheet-scroll">
               <table class="sheet-table">
@@ -1580,6 +2047,13 @@ h1 {
   margin: 0;
   font-size: 0.95rem;
   color: #1d4368;
+}
+
+.sheet-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 0.45rem;
 }
 
 .sheet-scroll {

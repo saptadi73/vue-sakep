@@ -28,6 +28,21 @@ export interface ConsolidationEliminationEntry {
   amount: number
 }
 
+export interface ConsolidationEliminationRuleResult {
+  ruleId: string
+  ruleName: string
+  enabled: boolean
+  scope: 'all' | 'entity-pair'
+  entityPair?: [string, string]
+  debitKey: string
+  creditKey: string
+  debitValue: number
+  creditValue: number
+  amount: number
+  applied: boolean
+  reason: string
+}
+
 export interface ConsolidationUnmappedEntry {
   entityId: string
   account: string
@@ -53,6 +68,7 @@ export interface ConsolidationPreviewResult {
   rows: ConsolidationPreviewRow[]
   sourceSummary: ConsolidationSourceSummary[]
   eliminations: ConsolidationEliminationEntry[]
+  eliminationRuleResults: ConsolidationEliminationRuleResult[]
   unmappedEntries: ConsolidationUnmappedEntry[]
   mappingSuggestions: ConsolidationMappingSuggestion[]
 }
