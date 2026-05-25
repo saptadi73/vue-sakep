@@ -1,4 +1,9 @@
 import {
+  fetchBprsBalanceSheet,
+  fetchBprsProfitLoss,
+  fetchBprsTrialBalance,
+} from '@/services/bprsService'
+import {
   fetchOdooCompanies,
   fetchOdooBalanceSheet,
   fetchOdooProfitLoss,
@@ -12,6 +17,10 @@ import {
   type ConsolidationSourceData,
 } from '@/services/consolidationEngineService'
 import type { ReportRow } from '@/types/report'
+
+const BPRS_LAST_SUCCESS_DATE_KEY = 'bprs:last-success-date'
+const BPRS_LAST_SELECTED_UNIT_KEY = 'bprs:last-selected-unit'
+const DEFAULT_BPRS_UNIT = '00'
 
 interface OdooEntityConfig {
   routeCode: string
@@ -84,6 +93,44 @@ const fetchRowsForSection = async (
   ).rows
 }
 
+const toBprsApiDate = (isoDate: string) => isoDate.replaceAll('-', '')
+
+const getPreferredBprsDate = (baseParams: OdooReportRequestParams) => {
+  if (typeof window === 'undefined') {
+    return baseParams.date_to
+  }
+
+  return window.localStorage.getItem(BPRS_LAST_SUCCESS_DATE_KEY) ?? baseParams.date_to
+}
+
+const getPreferredBprsUnit = () => {
+  if (typeof window === 'undefined') {
+    return DEFAULT_BPRS_UNIT
+  }
+
+  return window.localStorage.getItem(BPRS_LAST_SELECTED_UNIT_KEY) ?? DEFAULT_BPRS_UNIT
+}
+
+const fetchBprsRowsForSection = async (
+  section: ConsolidationSection,
+  baseParams: OdooReportRequestParams,
+): Promise<ReportRow[]> => {
+  const params = {
+    unit: getPreferredBprsUnit(),
+    tgl: toBprsApiDate(getPreferredBprsDate(baseParams)),
+  }
+
+  if (section === 'balance-sheet') {
+    return (await fetchBprsBalanceSheet(params)).data
+  }
+
+  if (section === 'pnl') {
+    return (await fetchBprsProfitLoss(params)).data
+  }
+
+  return (await fetchBprsTrialBalance(params)).data
+}
+
 export const loadOdooConsolidationSourceData = async (
   config: ConsolidationConfig,
   companies: OdooCompany[],
@@ -144,6 +191,11 @@ export const loadConsolidationSourceData = async (
               company_ids: [company.id],
             })
 
+            return [section, rows] as const
+          }
+
+          if (entity.source === 'bprs') {
+            const rows = await fetchBprsRowsForSection(section, baseParams)
             return [section, rows] as const
           }
 

@@ -9,7 +9,9 @@ import type { BprsReportRequestParams } from '@/types/bprsReport'
 const toIsoDate = (d: Date) => d.toISOString().substring(0, 10)
 const toApiDate = (iso: string) => iso.replaceAll('-', '') // YYYYMMDD
 const LAST_SUCCESS_DATE_KEY = 'bprs:last-success-date'
+const LAST_SELECTED_UNIT_KEY = 'bprs:last-selected-unit'
 const DEFAULT_SEED_DATE = '2025-03-01'
+const DEFAULT_UNIT = '00'
 
 const router = useRouter()
 
@@ -22,8 +24,16 @@ const getInitialDate = () => {
   return localStorage.getItem(LAST_SUCCESS_DATE_KEY) ?? DEFAULT_SEED_DATE
 }
 
+const getInitialUnit = () => {
+  if (typeof window === 'undefined') {
+    return DEFAULT_UNIT
+  }
+
+  return localStorage.getItem(LAST_SELECTED_UNIT_KEY) ?? DEFAULT_UNIT
+}
+
 const selectedDate = ref(getInitialDate())
-const selectedUnit = ref('00')
+const selectedUnit = ref(getInitialUnit())
 const wizardOpen = ref(false)
 const selectedAccount = ref<ReportRow | null>(null)
 const wizardStartDate = ref(today)
@@ -72,6 +82,10 @@ const loadReport = async () => {
   source.value = result.source
   sourceNote.value = [autoFallbackNote, result.note ?? ''].filter(Boolean).join(' ')
   debugInfo.value = result.debug ?? null
+
+  if (typeof window !== 'undefined') {
+    localStorage.setItem(LAST_SELECTED_UNIT_KEY, selectedUnit.value)
+  }
 
   if (result.source === 'live' && result.data.length > 0) {
     localStorage.setItem(LAST_SUCCESS_DATE_KEY, selectedDate.value)
