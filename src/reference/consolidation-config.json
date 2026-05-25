@@ -51,23 +51,23 @@
     },
     {
       "entityId": "pt-bprs",
-      "sourceAccount": "5*",
+      "sourceAccount": "05*",
       "consolidationKey": "cogs",
       "section": "pnl",
       "parentKey": "cost_of_sales",
       "lineType": "detail",
       "sign": -1,
-      "note": "Beban pokok penjualan"
+      "note": "Beban pokok penjualan (prefix akun BPRS 05*)"
     },
     {
       "entityId": "pt-bprs",
-      "sourceAccount": "6*",
+      "sourceAccount": "06*",
       "consolidationKey": "op_expenses",
       "section": "pnl",
       "parentKey": "operating_expenses",
       "lineType": "detail",
       "sign": -1,
-      "note": "Beban operasional"
+      "note": "Beban operasional (prefix akun BPRS 06*)"
     },
     {
       "entityId": "pt-uspps-kanjabung",

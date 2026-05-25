@@ -326,6 +326,12 @@ const debugEntities = computed(() => {
       const hasMatchedRows = matchedRows.length > 0
       const hasMappingsButNoRows = hasTargetMappings && rows.length > 0 && !hasRelevantSourceRows
       const hasRowsButNoMatch = hasTargetMappings && hasRelevantSourceRows && !hasMatchedRows
+      const hasLegacyBprsPrefixMapping =
+        entity.id === 'pt-bprs' &&
+        mappings.some((mapping) => {
+          const source = mapping.sourceAccount.trim()
+          return source === '5*' || source === '6*'
+        })
       const hasRelevantUnmappedRows = rows.some((row) =>
         mappings.some((mapping) => accountMatches(mapping.sourceAccount, row.Account)),
       )
@@ -344,11 +350,19 @@ const debugEntities = computed(() => {
       }
 
       if (hasMappingsButNoRows) {
-        warnings.push('Mapping target ada, tetapi rows source untuk pola sourceAccount itu tidak ditemukan.')
+        warnings.push(
+          'Mapping target ada, tetapi rows source untuk pola sourceAccount itu tidak ditemukan.',
+        )
       }
 
       if (hasRowsButNoMatch || (hasTargetMappings && hasRelevantUnmappedRows && !hasMatchedRows)) {
         warnings.push('Source rows ada dan mapping ada, tetapi pola sourceAccount tidak match.')
+      }
+
+      if (hasLegacyBprsPrefixMapping) {
+        warnings.push(
+          'Mapping PT BPRS masih memakai prefix lama (5*/6*). Gunakan prefix akun asli (05*/06*) agar match data live.',
+        )
       }
 
       if (missingTreeKeys.length > 0) {
@@ -565,11 +579,11 @@ const validateSpreadsheetColumns = (
 
 const normalizeSpreadsheetRows = (rows: Record<string, unknown>[]) => {
   return rows
-    .map((row) =>
-      Object.fromEntries(Object.entries(row).map(([key, value]) => [key.trim(), value])) as Record<
-        string,
-        unknown
-      >,
+    .map(
+      (row) =>
+        Object.fromEntries(
+          Object.entries(row).map(([key, value]) => [key.trim(), value]),
+        ) as Record<string, unknown>,
     )
     .filter((row) => Object.values(row).some((value) => toCellText(value) !== ''))
 }
@@ -579,9 +593,7 @@ const buildCoaMappingsFromRows = (
 ): { items: CoaMappingRule[]; errors: string[] } => {
   const errors = validateSpreadsheetColumns('coaMappings', rows)
   const entityIds = new Set(config.value.entities.map((entity) => entity.id))
-  const treeKeys = new Set(
-    config.value.reportTree.map((node) => `${node.section}|${node.key}`),
-  )
+  const treeKeys = new Set(config.value.reportTree.map((node) => `${node.section}|${node.key}`))
   const items: CoaMappingRule[] = []
 
   rows.forEach((row, index) => {
@@ -688,9 +700,7 @@ const buildEliminationRulesFromRows = (
 ): { items: EliminationRule[]; errors: string[] } => {
   const errors = validateSpreadsheetColumns('eliminationRules', rows)
   const entityIds = new Set(config.value.entities.map((entity) => entity.id))
-  const treeKeys = new Set(
-    config.value.reportTree.map((node) => `${node.section}|${node.key}`),
-  )
+  const treeKeys = new Set(config.value.reportTree.map((node) => `${node.section}|${node.key}`))
   const items: EliminationRule[] = []
 
   rows.forEach((row, index) => {
@@ -732,7 +742,9 @@ const buildEliminationRulesFromRows = (
     }
     if (scope === 'entity-pair') {
       if (!entityPairLeft || !entityPairRight) {
-        errors.push(`Baris ${line}: entityPairLeft dan entityPairRight wajib untuk scope entity-pair.`)
+        errors.push(
+          `Baris ${line}: entityPairLeft dan entityPairRight wajib untuk scope entity-pair.`,
+        )
       }
       if (entityPairLeft && !entityIds.has(entityPairLeft)) {
         errors.push(`Baris ${line}: entityPairLeft "${entityPairLeft}" belum ada di Entities.`)
@@ -750,8 +762,7 @@ const buildEliminationRulesFromRows = (
       debitKey,
       creditKey,
       scope: scope as EliminationRule['scope'],
-      entityPair:
-        scope === 'entity-pair' ? [entityPairLeft, entityPairRight] : undefined,
+      entityPair: scope === 'entity-pair' ? [entityPairLeft, entityPairRight] : undefined,
       method: method as EliminationRule['method'],
       percentage: method === 'percentage' ? (percentage ?? 0) : undefined,
       note: toCellText(row.note) || undefined,
@@ -761,7 +772,10 @@ const buildEliminationRulesFromRows = (
   return { items, errors }
 }
 
-const importSpreadsheetRows = (target: SpreadsheetImportTarget, rows: Record<string, unknown>[]) => {
+const importSpreadsheetRows = (
+  target: SpreadsheetImportTarget,
+  rows: Record<string, unknown>[],
+) => {
   if (target === 'coaMappings') {
     const { items, errors } = buildCoaMappingsFromRows(rows)
     if (errors.length > 0) return errors
@@ -1144,9 +1158,7 @@ const updateEliminationNote = (row: EliminationRule, event: Event) => {
             </thead>
             <tbody>
               <tr v-if="debugEntities.length === 0">
-                <td colspan="8" class="empty-cell">
-                  Tidak ada entity aktif di config.
-                </td>
+                <td colspan="8" class="empty-cell">Tidak ada entity aktif di config.</td>
               </tr>
               <tr v-for="entry in debugEntities" :key="entry.entity.id">
                 <td>{{ entry.entity.id }}</td>

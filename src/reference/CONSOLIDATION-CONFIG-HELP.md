@@ -53,3 +53,17 @@ Setelah config valid dan preview dikonfirmasi:
 - Perubahan belum permanen sampai klik **Simpan Config**.
 - Untuk perubahan besar, selalu Export JSON sebagai snapshot sebelum update.
 - Simpan snapshot JSON setiap periode pelaporan untuk audit trail.
+
+## Catatan BPRS Live
+
+- Untuk entitas `pt-bprs`, source data konsolidasi memakai data live dari API BPRS.
+- Akun seperti `0101001` hanya akan muncul jika memang ada pada laporan BPRS live (unit dan tanggal yang sesuai).
+- Unit BPRS terakhir yang dipakai di halaman laporan BPRS akan dipakai ulang saat preview/laporan konsolidasi.
+- Jika API BPRS gagal, sistem otomatis fallback ke mock data.
+
+Langkah cepat cek akun BPRS belum muncul:
+
+1. Buka halaman laporan BPRS dan pastikan akun muncul di sana.
+2. Kembali ke `/consolidation/config`, cek `entityId=pt-bprs` dan `sourceAccount` mapping.
+3. Pastikan `consolidationKey` ada di `reportTree` section yang sama.
+4. Buka `/consolidation/preview`, lalu klik **Hitung Ulang Preview**.

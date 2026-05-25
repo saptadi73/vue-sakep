@@ -66,6 +66,27 @@ Catatan:
 - Top Unmapped Accounts: daftar akun yang masih belum punya rule mapping.
 - Suggested Mapping Draft: rekomendasi mapping otomatis berdasarkan prefix akun dan kata kunci deskripsi.
 
+## Catatan Source Data BPRS (Update 2026-05-25)
+
+Untuk entitas dengan `source = bprs` (contoh: `pt-bprs`), data preview dan laporan konsolidasi sekarang mengambil data live dari service BPRS, bukan hanya data mock statis.
+
+Implikasinya:
+
+- Akun native BPRS seperti `0101001` bisa ikut diproses pada konsolidasi jika memang ada pada response API BPRS.
+- Unit BPRS yang terakhir dipakai di halaman laporan BPRS disimpan ke localStorage (`bprs:last-selected-unit`) dan dipakai ulang saat konsolidasi memuat data source.
+- Tanggal prioritas yang dipakai untuk fetch BPRS mengikuti tanggal sukses terakhir laporan BPRS (`bprs:last-success-date`), lalu fallback ke `date_to` periode konsolidasi.
+
+Checklist agar akun BPRS muncul di Line Result:
+
+1. Pastikan akun muncul di laporan BPRS live untuk unit dan tanggal yang dipilih.
+2. Pastikan `entityId` mapping adalah `pt-bprs` dan `section` mapping sesuai (pnl, balance-sheet, atau trial-balance).
+3. Pastikan `sourceAccount` cocok dengan format akun API BPRS (exact match atau wildcard seperti `0101*`).
+4. Untuk akun beban BPRS yang memakai leading zero, gunakan prefix asli seperti `05*` dan `06*` (bukan `5*`/`6*`).
+5. Pastikan `consolidationKey` ada di `reportTree` untuk section yang sama.
+6. Klik Hitung Ulang Preview setelah update mapping.
+
+Jika API BPRS gagal/timeout/konfigurasi tidak valid, aplikasi tetap fallback ke data mock.
+
 Dokumen ringkas untuk menu Help aplikasi juga tersedia di src/reference/CONSOLIDATION-CONFIG-HELP.md.
 
 ## Export Laporan
