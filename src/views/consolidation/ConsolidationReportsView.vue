@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { buildConsolidationPreview } from '@/services/consolidationEngineService'
 import {
   getDefaultConsolidationConfig,
@@ -70,6 +70,10 @@ const getReportPeriodParams = () => {
 
 const generateReports = async () => {
   isGenerating.value = true
+  generationStatus.value = ''
+
+  await nextTick()
+  await new Promise((resolve) => requestAnimationFrame(resolve))
 
   try {
     const fromBackend = await loadConsolidationConfigFromFile()
@@ -228,7 +232,8 @@ const exportXls = () => {
             :disabled="isGenerating"
             @click="generateReports"
           >
-            {{ isGenerating ? 'Memproses Laporan...' : 'Tampilkan Laporan' }}
+            <span v-if="isGenerating" class="btn-spinner" aria-hidden="true"></span>
+            <span>{{ isGenerating ? 'Memproses Laporan...' : 'Tampilkan Laporan' }}</span>
           </button>
         </div>
       </div>
@@ -289,7 +294,11 @@ const exportXls = () => {
       </div>
 
       <!-- Report table -->
-      <article class="report-card" id="print-area">
+      <article class="report-card" id="print-area" :aria-busy="isGenerating">
+        <div v-if="isGenerating" class="report-loading-overlay" role="status" aria-live="polite">
+          <span class="spinner spinner-lg" aria-hidden="true"></span>
+          <span>Memuat ulang laporan untuk periode {{ periodLabel }}...</span>
+        </div>
         <div class="report-header">
           <div>
             <p class="report-period">Periode: {{ periodLabel }}</p>
@@ -349,7 +358,11 @@ const exportXls = () => {
       </article>
     </template>
 
-    <div v-else class="empty-state">
+    <div v-else class="empty-state" :aria-busy="isGenerating">
+      <div v-if="isGenerating" class="empty-loading" role="status" aria-live="polite">
+        <span class="spinner spinner-lg" aria-hidden="true"></span>
+        <span>Memproses laporan konsolidasi...</span>
+      </div>
       <p>Pilih bulan dan tahun lalu klik <strong>Tampilkan Laporan</strong> untuk memulai.</p>
     </div>
   </section>
@@ -424,6 +437,11 @@ const exportXls = () => {
   align-items: flex-end;
 }
 .btn-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.45rem;
+  min-width: 12.8rem;
   padding: 0.5rem 1.1rem;
   border-radius: 9px;
   border: none;
@@ -441,6 +459,16 @@ const exportXls = () => {
 .btn-primary:disabled {
   opacity: 0.7;
   cursor: not-allowed;
+}
+
+.btn-spinner {
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.42);
+  border-top-color: #fff;
+  animation: spin 0.8s linear infinite;
+  flex: 0 0 auto;
 }
 
 .loading-inline {
@@ -464,6 +492,12 @@ const exportXls = () => {
   border-top-color: #1a5ca8;
   animation: spin 0.9s linear infinite;
   flex: 0 0 auto;
+}
+
+.spinner-lg {
+  width: 1.35rem;
+  height: 1.35rem;
+  border-width: 3px;
 }
 
 @keyframes spin {
@@ -557,11 +591,34 @@ const exportXls = () => {
 
 /* ── Report card ── */
 .report-card {
+  position: relative;
   background: #fff;
   border-radius: 14px;
   border: 1px solid rgba(14, 55, 93, 0.14);
   padding: 1.1rem;
   overflow-x: auto;
+}
+
+.report-card[aria-busy='true'] {
+  min-height: 12rem;
+}
+
+.report-loading-overlay {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  margin: -0.3rem -0.3rem 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  border: 1px solid #b8d8f6;
+  border-radius: 10px;
+  background: #eef6ff;
+  color: #173d64;
+  padding: 0.75rem 0.85rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  box-shadow: 0 8px 22px rgba(14, 43, 82, 0.1);
 }
 .report-header {
   display: flex;
@@ -692,12 +749,22 @@ const exportXls = () => {
 
 /* ── Empty state ── */
 .empty-state {
+  position: relative;
   background: #f7fafd;
   border-radius: 12px;
   border: 1px dashed #c7d9ec;
   padding: 2rem;
   text-align: center;
   color: #4e6e8e;
+}
+
+.empty-loading {
+  margin: 0 auto 0.85rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.65rem;
+  color: #173d64;
+  font-weight: 700;
 }
 
 /* ── Print ── */
