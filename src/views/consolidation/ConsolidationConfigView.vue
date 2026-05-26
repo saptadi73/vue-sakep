@@ -554,6 +554,60 @@ const downloadSpreadsheetTemplate = (target: SpreadsheetImportTarget) => {
   exportToExcel(rows, template.sheetName, template.fileName)
 }
 
+const buildSpreadsheetExportRows = (target: SpreadsheetImportTarget): Record<string, unknown>[] => {
+  if (target === 'coaMappings') {
+    return config.value.coaMappings.map((row) => ({
+      entityId: row.entityId,
+      sourceAccount: row.sourceAccount,
+      sourceDescriptionContains: row.sourceDescriptionContains ?? '',
+      consolidationKey: row.consolidationKey,
+      section: row.section,
+      parentKey: row.parentKey ?? '',
+      lineType: row.lineType ?? 'detail',
+      sign: row.sign ?? 1,
+      note: row.note ?? '',
+    }))
+  }
+
+  if (target === 'reportTree') {
+    return config.value.reportTree.map((row) => ({
+      key: row.key,
+      section: row.section,
+      label: row.label,
+      lineType: row.lineType,
+      parentKey: row.parentKey ?? '',
+      order: row.order,
+      formula: row.formula ?? '',
+    }))
+  }
+
+  return config.value.eliminationRules.map((row) => ({
+    id: row.id,
+    name: row.name,
+    enabled: row.enabled,
+    section: row.section,
+    debitKey: row.debitKey,
+    creditKey: row.creditKey,
+    scope: row.scope,
+    entityPairLeft: row.entityPair?.[0] ?? '',
+    entityPairRight: row.entityPair?.[1] ?? '',
+    method: row.method,
+    percentage: row.method === 'percentage' ? (row.percentage ?? 100) : '',
+    note: row.note ?? '',
+  }))
+}
+
+const exportSpreadsheetConfig = (target: SpreadsheetImportTarget) => {
+  const template = spreadsheetTemplates[target]
+  const rows = buildSpreadsheetExportRows(target).map((row) => {
+    return Object.fromEntries(template.columns.map((column) => [column, row[column] ?? '']))
+  })
+
+  const stamp = new Date().toISOString().slice(0, 10)
+  exportToExcel(rows, template.sheetName, `config-${target}-${stamp}`)
+  statusMessage.value = `${template.label} berhasil disimpan ke file Excel.`
+}
+
 const toCellText = (value: unknown) => String(value ?? '').trim()
 
 const parseBooleanCell = (value: unknown): boolean | null => {
@@ -1381,6 +1435,9 @@ const updateEliminationNote = (row: EliminationRule, event: Event) => {
                 <button type="button" class="btn" @click="triggerSpreadsheetImport('coaMappings')">
                   Upload XLS/CSV
                 </button>
+                <button type="button" class="btn" @click="exportSpreadsheetConfig('coaMappings')">
+                  Save Config XLS
+                </button>
                 <button type="button" class="btn" @click="addMapping">Tambah Baris</button>
               </div>
             </div>
@@ -1492,6 +1549,9 @@ const updateEliminationNote = (row: EliminationRule, event: Event) => {
                 <button type="button" class="btn" @click="triggerSpreadsheetImport('reportTree')">
                   Upload XLS/CSV
                 </button>
+                <button type="button" class="btn" @click="exportSpreadsheetConfig('reportTree')">
+                  Save Config XLS
+                </button>
                 <button type="button" class="btn" @click="addTreeNode">Tambah Baris</button>
               </div>
             </div>
@@ -1578,6 +1638,13 @@ const updateEliminationNote = (row: EliminationRule, event: Event) => {
                   @click="triggerSpreadsheetImport('eliminationRules')"
                 >
                   Upload XLS/CSV
+                </button>
+                <button
+                  type="button"
+                  class="btn"
+                  @click="exportSpreadsheetConfig('eliminationRules')"
+                >
+                  Save Config XLS
                 </button>
                 <button type="button" class="btn" @click="addEliminationRule">Tambah Baris</button>
               </div>

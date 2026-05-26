@@ -228,9 +228,13 @@ const exportXls = () => {
             :disabled="isGenerating"
             @click="generateReports"
           >
-            Tampilkan Laporan
+            {{ isGenerating ? 'Memproses Laporan...' : 'Tampilkan Laporan' }}
           </button>
         </div>
+      </div>
+      <div v-if="isGenerating" class="loading-inline" role="status" aria-live="polite">
+        <span class="spinner" aria-hidden="true"></span>
+        <span>Sedang memproses laporan konsolidasi. Mohon tunggu...</span>
       </div>
       <p v-if="generationStatus" class="period-badge">{{ generationStatus }}</p>
       <p v-if="isGenerated" class="period-badge">
@@ -245,6 +249,7 @@ const exportXls = () => {
         <button
           type="button"
           class="tab-btn"
+          :disabled="isGenerating"
           :class="{ active: activeTab === 'balance-sheet' }"
           @click="activeTab = 'balance-sheet'"
         >
@@ -253,6 +258,7 @@ const exportXls = () => {
         <button
           type="button"
           class="tab-btn"
+          :disabled="isGenerating"
           :class="{ active: activeTab === 'pnl' }"
           @click="activeTab = 'pnl'"
         >
@@ -261,14 +267,24 @@ const exportXls = () => {
         <button
           type="button"
           class="tab-btn"
+          :disabled="isGenerating"
           :class="{ active: activeTab === 'trial-balance' }"
           @click="activeTab = 'trial-balance'"
         >
           Trial Balance
         </button>
         <div class="tab-bar-actions">
-          <button type="button" class="btn-outline print-btn" @click="printReport">Cetak</button>
-          <button type="button" class="btn-xls" @click="exportXls">Export XLS</button>
+          <button
+            type="button"
+            class="btn-outline print-btn"
+            :disabled="isGenerating"
+            @click="printReport"
+          >
+            Cetak
+          </button>
+          <button type="button" class="btn-xls" :disabled="isGenerating" @click="exportXls">
+            Export XLS
+          </button>
         </div>
       </div>
 
@@ -284,7 +300,11 @@ const exportXls = () => {
 
         <div v-if="activeSourceIssues.length > 0" class="source-alert">
           <strong>Source data belum sepenuhnya live.</strong>
-          <div v-for="source in activeSourceIssues" :key="source.entityId" class="source-alert-line">
+          <div
+            v-for="source in activeSourceIssues"
+            :key="source.entityId"
+            class="source-alert-line"
+          >
             {{ source.entityId }}: {{ source.status }} | {{ source.sourceLabel }} |
             {{ source.periodLabel ?? '-' }} | {{ source.note ?? '-' }}
           </div>
@@ -418,6 +438,39 @@ const exportXls = () => {
 .btn-primary:hover {
   opacity: 0.85;
 }
+.btn-primary:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
+}
+
+.loading-inline {
+  margin: 0.7rem 0 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.88rem;
+  color: #1f4f7c;
+  background: #eef6ff;
+  border: 1px solid #c7d9ec;
+  border-radius: 8px;
+  padding: 0.45rem 0.65rem;
+}
+
+.spinner {
+  width: 0.92rem;
+  height: 0.92rem;
+  border-radius: 50%;
+  border: 2px solid #b7cce4;
+  border-top-color: #1a5ca8;
+  animation: spin 0.9s linear infinite;
+  flex: 0 0 auto;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
 .period-badge {
   margin: 0.7rem 0 0;
   font-size: 0.87rem;
@@ -449,6 +502,10 @@ const exportXls = () => {
 .tab-btn:hover {
   background: #daeaf8;
 }
+.tab-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
 .tab-btn.active {
   background: #11325b;
   color: #fff;
@@ -474,6 +531,10 @@ const exportXls = () => {
 .print-btn:hover {
   background: #f0f5fb;
 }
+.print-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+}
 .btn-xls {
   padding: 0.48rem 0.95rem;
   border-radius: 9px;
@@ -488,6 +549,10 @@ const exportXls = () => {
 }
 .btn-xls:hover {
   opacity: 0.85;
+}
+.btn-xls:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
 }
 
 /* ── Report card ── */
