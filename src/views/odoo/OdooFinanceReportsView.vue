@@ -8,6 +8,7 @@ import {
   fetchOdooProfitLoss,
   fetchOdooTrialBalance,
 } from '@/services/odooService'
+import { exportMultiSheetExcel } from '@/utils/excelExport'
 import odooEntitiesConfigJson from '@/reference/odoo-entities-config.json'
 import { useOdooAuthStore } from '@/stores/odooAuth'
 import type { OdooCompany, OdooReportRequestParams } from '@/types/odoo'
@@ -210,6 +211,23 @@ onMounted(async () => {
   await authStore.ensureCompanies()
   await loadReport()
 })
+
+const exportReport = () => {
+  if (!rows.value.length) return
+  const isTrialBalance = reportKind.value === 'trial-balance'
+  const columns = isTrialBalance
+    ? ['Account', 'Description', 'Debit', 'Kredit']
+    : ['Account', 'Description', 'Amount']
+  const exportRows = isTrialBalance
+    ? rows.value.map((r) => [r.Account ?? '', r.Description ?? '', r.Amount ?? '', r.Amount1 ?? ''])
+    : rows.value.map((r) => [r.Account ?? '', r.Description ?? '', r.Amount ?? ''])
+  const companySlug = (selectedCompany.value?.name ?? currentCompanyCode.value).replace(/\s+/g, '_')
+  const titleSlug = activeTitle.value.replace(/\s+/g, '_')
+  exportMultiSheetExcel(
+    [{ name: activeTitle.value, columns, rows: exportRows }],
+    `${companySlug}_${titleSlug}_${filters.value.date_from}_${filters.value.date_to}`,
+  )
+}
 </script>
 
 <template>
@@ -264,6 +282,17 @@ onMounted(async () => {
         {{ loading ? 'Memuat...' : 'Muat Laporan' }}
       </button>
     </form>
+
+    <div class="report-actions">
+      <button
+        type="button"
+        class="export-btn"
+        :disabled="!rows.length || loading"
+        @click="exportReport"
+      >
+        ⬇ Export Excel
+      </button>
+    </div>
 
     <p v-if="errorMessage" class="error-banner">{{ errorMessage }}</p>
     <p class="updated">Update terakhir: {{ lastUpdated || '-' }}</p>
@@ -396,5 +425,28 @@ onMounted(async () => {
   margin: 0;
   font-size: 0.84rem;
   color: #5a6c89;
+}
+
+.report-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.export-btn {
+  min-height: 34px;
+  border-radius: 8px;
+  border: 1px solid #91aed1;
+  background: #f3f8ff;
+  color: #1d3f6c;
+  padding: 0.35rem 0.9rem;
+  cursor: pointer;
+  font-weight: 600;
+  font: inherit;
+}
+
+.export-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>

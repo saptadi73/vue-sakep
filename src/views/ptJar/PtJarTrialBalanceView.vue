@@ -3,6 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import TrialBalanceTable from '@/components/TrialBalanceTable.vue'
 import { fetchJarTrialBalance } from '@/services/jabMartService'
+import { exportMultiSheetExcel } from '@/utils/excelExport'
 import type { JarReportRequestParams, ReportRow } from '@/types/report'
 
 const router = useRouter()
@@ -95,6 +96,25 @@ onMounted(loadReport)
 watch(selectedLokasi, () => {
   loadReport()
 })
+
+const exportReport = () => {
+  if (!rows.value.length) return
+  exportMultiSheetExcel(
+    [
+      {
+        name: 'Trial Balance',
+        columns: ['Account', 'Description', 'Debit', 'Kredit'],
+        rows: rows.value.map((r) => [
+          r.Account ?? '',
+          r.Description ?? '',
+          r.Amount ?? '',
+          r.Amount1 ?? '',
+        ]),
+      },
+    ],
+    `PTJAR_TrialBalance_${selectedMonth.value}_${selectedYear.value}`,
+  )
+}
 </script>
 
 <template>
@@ -141,6 +161,17 @@ watch(selectedLokasi, () => {
         {{ loading ? 'Memuat...' : 'Muat Laporan' }}
       </button>
     </form>
+
+    <div class="report-actions">
+      <button
+        type="button"
+        class="export-btn"
+        :disabled="!rows.length || loading"
+        @click="exportReport"
+      >
+        ⬇ Export Excel
+      </button>
+    </div>
 
     <p class="updated">Update terakhir: {{ lastUpdated || '-' }}</p>
 
@@ -237,5 +268,28 @@ watch(selectedLokasi, () => {
   font-size: 0.8rem;
   color: #8a9ab5;
   margin: 0;
+}
+
+.report-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.export-btn {
+  min-height: 34px;
+  border-radius: 8px;
+  border: 1px solid #91aed1;
+  background: #f3f8ff;
+  color: #1d3f6c;
+  padding: 0.35rem 0.9rem;
+  cursor: pointer;
+  font-weight: 600;
+  font: inherit;
+}
+
+.export-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>

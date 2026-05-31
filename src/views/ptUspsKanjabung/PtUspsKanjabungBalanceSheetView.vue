@@ -2,6 +2,7 @@
 import { computed, onMounted, ref } from 'vue'
 import ReportTable from '@/components/ReportTable.vue'
 import { fetchUspsKanjabungBalanceSheet } from '@/services/usppsKanjabungService'
+import { exportMultiSheetExcel } from '@/utils/excelExport'
 import type { ReportRow } from '@/types/report'
 import type { UspsKanjabungReportRequestParams } from '@/types/usppsKanjabungReport'
 
@@ -99,6 +100,20 @@ const loadReport = async () => {
 }
 
 onMounted(loadReport)
+
+const exportReport = () => {
+  if (!rows.value.length) return
+  exportMultiSheetExcel(
+    [
+      {
+        name: 'Balance Sheet',
+        columns: ['Account', 'Description', 'Amount'],
+        rows: rows.value.map((r) => [r.Account ?? '', r.Description ?? '', r.Amount ?? '']),
+      },
+    ],
+    `USPPS_Neraca_${selectedDate.value}_Unit${selectedUnit.value}`,
+  )
+}
 </script>
 
 <template>
@@ -129,6 +144,17 @@ onMounted(loadReport)
         {{ loading ? 'Memuat...' : 'Muat Laporan' }}
       </button>
     </form>
+
+    <div class="report-actions">
+      <button
+        type="button"
+        class="export-btn"
+        :disabled="!rows.length || loading"
+        @click="exportReport"
+      >
+        ⬇ Export Excel
+      </button>
+    </div>
 
     <p class="updated">Update terakhir: {{ lastUpdated || '-' }}</p>
 
@@ -257,5 +283,28 @@ onMounted(loadReport)
   font-size: 0.92rem;
   max-height: 400px;
   overflow: auto;
+}
+
+.report-actions {
+  display: flex;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.export-btn {
+  min-height: 34px;
+  border-radius: 8px;
+  border: 1px solid #91aed1;
+  background: #f3f8ff;
+  color: #1d3f6c;
+  padding: 0.35rem 0.9rem;
+  cursor: pointer;
+  font-weight: 600;
+  font: inherit;
+}
+
+.export-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 </style>
