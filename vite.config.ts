@@ -103,6 +103,12 @@ export default defineConfig({
         secure: true,
         rewrite: (path) => path.replace(/^\/api\/jabmart/, '/kan/goerpapi.asmx'),
       },
+      '/api/uspps-kanjabung': {
+        target: 'https://api-uspps.kanjabung.com',
+        changeOrigin: true,
+        secure: true,
+        rewrite: (path) => path.replace(/^\/api\/uspps-kanjabung/, ''),
+      },
     },
   },
   resolve: {

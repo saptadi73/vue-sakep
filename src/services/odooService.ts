@@ -12,6 +12,8 @@ import type {
 } from '@/types/odoo'
 
 const SERVER_URL_STORAGE_KEY = 'odoo:server-url'
+const DATABASE_STORAGE_KEY = 'odoo:database'
+const AUTH_SESSION_STORAGE_KEY = 'odoo:auth-session'
 const DEFAULT_API_BASE_URL = (
   import.meta.env.VITE_ODOO_API_BASE_URL ??
   import.meta.env.VITE_ODOO_BASE_URL ??
@@ -19,6 +21,50 @@ const DEFAULT_API_BASE_URL = (
 ).replace(/\/$/, '')
 
 const normalizeServerUrl = (url: string) => url.trim().replace(/\/$/, '')
+const normalizeDatabase = (database: string) => database.trim()
+
+const getPersistedSessionDatabase = () => {
+  if (typeof window === 'undefined') {
+    return ''
+  }
+
+  const rawSession = window.localStorage.getItem(AUTH_SESSION_STORAGE_KEY)
+  if (!rawSession) {
+    return ''
+  }
+
+  try {
+    const session = JSON.parse(rawSession) as { user?: { db?: unknown } }
+    return typeof session.user?.db === 'string' ? normalizeDatabase(session.user.db) : ''
+  } catch {
+    return ''
+  }
+}
+
+const getOdooDatabase = () => {
+  if (typeof window === 'undefined') {
+    return normalizeDatabase(import.meta.env.VITE_ODOO_DB ?? '')
+  }
+
+  return (
+    normalizeDatabase(window.localStorage.getItem(DATABASE_STORAGE_KEY) ?? '') ||
+    getPersistedSessionDatabase() ||
+    normalizeDatabase(import.meta.env.VITE_ODOO_DB ?? '')
+  )
+}
+
+const setOdooDatabase = (database: string) => {
+  if (typeof window === 'undefined') {
+    return
+  }
+
+  const normalized = normalizeDatabase(database)
+  if (normalized) {
+    window.localStorage.setItem(DATABASE_STORAGE_KEY, normalized)
+  } else {
+    window.localStorage.removeItem(DATABASE_STORAGE_KEY)
+  }
+}
 
 export const getOdooServerUrl = () => {
   if (typeof window === 'undefined') {
@@ -47,18 +93,22 @@ export const setOdooServerUrl = (serverUrl: string) => {
   window.localStorage.setItem(SERVER_URL_STORAGE_KEY, normalized)
 }
 
-const buildUrl = (endpoint: string) => {
+const buildUrl = (endpoint: string, database = getOdooDatabase()) => {
   const apiBaseUrl = getOdooServerUrl()
+  let url = endpoint
 
   if (/^https?:\/\//i.test(endpoint)) {
-    return endpoint
+    url = endpoint
+  } else if (apiBaseUrl) {
+    url = `${apiBaseUrl}${endpoint}`
   }
 
-  if (!apiBaseUrl) {
-    return endpoint
+  if (!database) {
+    return url
   }
 
-  return `${apiBaseUrl}${endpoint}`
+  const separator = url.includes('?') ? '&' : '?'
+  return `${url}${separator}db=${encodeURIComponent(database)}`
 }
 
 const decimalFormatter = new Intl.NumberFormat('en-US', {
@@ -136,8 +186,12 @@ const parseRpcPayload = <T>(payload: unknown): T => {
   throw new Error('Response API Odoo tidak dikenali.')
 }
 
-const postRpc = async <T, P extends object>(endpoint: string, params: P): Promise<T> => {
-  const response = await fetch(buildUrl(endpoint), {
+const postRpc = async <T, P extends object>(
+  endpoint: string,
+  params: P,
+  database = getOdooDatabase(),
+): Promise<T> => {
+  const response = await fetch(buildUrl(endpoint, database), {
     method: 'POST',
     credentials: 'include',
     headers: {
@@ -190,8 +244,11 @@ export const authenticateOdoo = async (payload: OdooAuthPayload): Promise<OdooUs
   const rawSession = await postRpc<unknown, OdooAuthPayload>(
     '/api/accounting/authenticate',
     payload,
+    payload.db,
   )
-  return normalizeUserSession(rawSession, payload.db)
+  const session = normalizeUserSession(rawSession, payload.db)
+  setOdooDatabase(session.db)
+  return session
 }
 
 export const fetchOdooCompanies = async (): Promise<OdooCompaniesPayload> => {
