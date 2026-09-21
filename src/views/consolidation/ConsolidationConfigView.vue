@@ -442,7 +442,7 @@ const applyJsonText = async () => {
   }
 
   config.value = parsed as ConsolidationConfig
-  const saveResult = await saveConsolidationConfig(config.value)
+  const saveResult = await saveConsolidationConfig(config.value, authStore.activeCompanyId)
   syncJsonFromConfig()
   statusMessage.value = buildSaveStatusMessage(saveResult)
 
@@ -464,7 +464,7 @@ const saveTableConfig = async () => {
     return
   }
 
-  const saveResult = await saveConsolidationConfig(config.value)
+  const saveResult = await saveConsolidationConfig(config.value, authStore.activeCompanyId)
   syncJsonFromConfig()
   parseErrors.value = []
   statusMessage.value = buildSaveStatusMessage(saveResult, true)
@@ -512,7 +512,7 @@ const reloadFromStorage = async () => {
 }
 
 const resetToDefault = () => {
-  config.value = resetConsolidationConfig()
+  config.value = resetConsolidationConfig(authStore.activeCompanyId)
   syncJsonFromConfig()
   parseErrors.value = []
   activeSourceLabel.value = 'template default'

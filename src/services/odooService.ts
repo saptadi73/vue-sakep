@@ -370,9 +370,14 @@ const collectOdooConfigItems = (payload: unknown): OdooJsonConfigRecord[] => {
   }
 
   const root = payload as Record<string, unknown>
-  const fromItems = Array.isArray(root.items)
-    ? root.items.map(asOdooConfigRecord).filter((item): item is OdooJsonConfigRecord => !!item)
-    : []
+  const rawItems = Array.isArray(root.items)
+    ? root.items
+    : Array.isArray(root.configs)
+      ? root.configs
+      : []
+  const fromItems = rawItems
+    .map(asOdooConfigRecord)
+    .filter((item): item is OdooJsonConfigRecord => !!item)
 
   if (fromItems.length > 0) {
     return fromItems
@@ -431,15 +436,31 @@ export const upsertOdooJsonConfig = async (params: {
   sequence?: number
   config: unknown
 }): Promise<OdooJsonConfigRecord | null> => {
+  const requestedCompanyId = params.company_id ?? null
+  const existingPayload = await listOdooJsonConfigs({
+    search: params.code,
+    include_inactive: true,
+    include_config: false,
+    page: 1,
+    limit: 100,
+  })
+  const matchingItems = (existingPayload.items ?? []).filter((item) => item.code === params.code)
+  const sameScope = matchingItems.filter((item) => (item.company_id ?? null) === requestedCompanyId)
+  // Prefer the requested company scope, then an existing global record. This prevents
+  // another global duplicate when an older deployment already created one.
+  const existing = [...sameScope, ...matchingItems.filter((item) => !sameScope.includes(item))]
+    .sort((left, right) => right.id - left.id)[0]
+
   const updatePayload = {
+    ...(existing && existing.id > 0 ? { id: existing.id } : {}),
     code: params.code,
     config: params.config,
     ...(typeof params.description === 'string' ? { description: params.description } : {}),
     ...(typeof params.sequence === 'number' ? { sequence: params.sequence } : {}),
-    ...(typeof params.company_id === 'number' ? { company_id: params.company_id } : {}),
+    company_id: existing ? (existing.company_id ?? null) : requestedCompanyId,
   }
 
-  try {
+  if (existing) {
     const updated = await postRpc<unknown, typeof updatePayload>(
       '/api/accounting/configs/update',
       updatePayload,
@@ -448,8 +469,8 @@ export const upsertOdooJsonConfig = async (params: {
     if (normalizedUpdated) {
       return normalizedUpdated
     }
-  } catch {
-    // Fallback to create when config code does not exist yet.
+
+    throw new Error(`Backend tidak mengembalikan record hasil update untuk config ${params.code}.`)
   }
 
   const createPayload = {
@@ -465,5 +486,10 @@ export const upsertOdooJsonConfig = async (params: {
     '/api/accounting/configs/create',
     createPayload,
   )
-  return collectOdooConfigItems(created)[0] ?? null
+  const normalizedCreated = collectOdooConfigItems(created)[0]
+  if (!normalizedCreated) {
+    throw new Error(`Backend tidak mengembalikan record hasil create untuk config ${params.code}.`)
+  }
+
+  return normalizedCreated
 }

@@ -108,6 +108,7 @@ export const loadConsolidationConfigFromFile = loadConsolidationConfigFromBacken
 
 export const saveConsolidationConfig = async (
   config: ConsolidationConfig,
+  companyId: number | null = null,
 ): Promise<SaveConsolidationConfigResult> => {
   const normalized = normalizeConfig(config)
 
@@ -122,6 +123,7 @@ export const saveConsolidationConfig = async (
     await upsertOdooJsonConfig({
       name: ODOO_CONFIG_NAME,
       code: ODOO_CONFIG_CODE,
+      company_id: companyId,
       sequence: 10,
       config: normalized,
     })
@@ -141,8 +143,8 @@ export const saveConsolidationConfig = async (
   }
 }
 
-export const resetConsolidationConfig = (): ConsolidationConfig => {
+export const resetConsolidationConfig = (companyId: number | null = null): ConsolidationConfig => {
   const next = cloneDefault()
-  void saveConsolidationConfig(next)
+  void saveConsolidationConfig(next, companyId)
   return next
 }

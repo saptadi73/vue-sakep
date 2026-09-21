@@ -283,7 +283,7 @@ const applySuggestionsToConfig = async () => {
     return
   }
 
-  const saveResult = await saveConsolidationConfig(config)
+  const saveResult = await saveConsolidationConfig(config, authStore.activeCompanyId)
   if (saveResult.mode === 'backend-and-storage') {
     activeConfig.value = config
   }
