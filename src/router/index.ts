@@ -1,21 +1,4 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import PtJarBalanceSheetView from '@/views/ptJar/PtJarBalanceSheetView.vue'
-import PtJarPnlView from '@/views/ptJar/PtJarPnlView.vue'
-import PtJarLedgerView from '@/views/ptJar/PtJarLedgerView.vue'
-import PtJarTrialBalanceView from '@/views/ptJar/PtJarTrialBalanceView.vue'
-import PtBprsBalanceSheetView from '@/views/ptBprs/PtBprsBalanceSheetView.vue'
-import PtBprsPnlView from '@/views/ptBprs/PtBprsPnlView.vue'
-import PtBprsGlView from '@/views/ptBprs/PtBprsGlView.vue'
-import PtBprsTrialBalanceView from '@/views/ptBprs/PtBprsTrialBalanceView.vue'
-import PtUspsKanjabungBalanceSheetView from '@/views/ptUspsKanjabung/PtUspsKanjabungBalanceSheetView.vue'
-import PtUspsKanjabungPnlView from '@/views/ptUspsKanjabung/PtUspsKanjabungPnlView.vue'
-import PtUspsKanjabungTrialBalanceView from '@/views/ptUspsKanjabung/PtUspsKanjabungTrialBalanceView.vue'
-import OdooLoginView from '@/views/odoo/OdooLoginView.vue'
-import OdooFinanceReportsView from '@/views/odoo/OdooFinanceReportsView.vue'
-import ConsolidationConfigView from '@/views/consolidation/ConsolidationConfigView.vue'
-import ConsolidationPreviewView from '@/views/consolidation/ConsolidationPreviewView.vue'
-import ConsolidationReportsView from '@/views/consolidation/ConsolidationReportsView.vue'
-import ConsolidationConfigHelpView from '@/views/help/ConsolidationConfigHelpView.vue'
 import { useOdooAuthStore } from '@/stores/odooAuth'
 
 const router = createRouter({
@@ -28,92 +11,92 @@ const router = createRouter({
     {
       path: '/reports/pt-jar/balance-sheet',
       name: 'pt-jar-balance-sheet',
-      component: PtJarBalanceSheetView,
+      component: () => import('@/views/ptJar/PtJarBalanceSheetView.vue'),
     },
     {
       path: '/reports/pt-jar/pnl',
       name: 'pt-jar-pnl',
-      component: PtJarPnlView,
+      component: () => import('@/views/ptJar/PtJarPnlView.vue'),
     },
     {
       path: '/reports/pt-jar/ledger',
       name: 'pt-jar-ledger',
-      component: PtJarLedgerView,
+      component: () => import('@/views/ptJar/PtJarLedgerView.vue'),
     },
     {
       path: '/reports/pt-jar/trial-balance',
       name: 'pt-jar-trial-balance',
-      component: PtJarTrialBalanceView,
+      component: () => import('@/views/ptJar/PtJarTrialBalanceView.vue'),
     },
     {
       path: '/reports/pt-bprs/balance-sheet',
       name: 'pt-bprs-balance-sheet',
-      component: PtBprsBalanceSheetView,
+      component: () => import('@/views/ptBprs/PtBprsBalanceSheetView.vue'),
     },
     {
       path: '/reports/pt-bprs/pnl',
       name: 'pt-bprs-pnl',
-      component: PtBprsPnlView,
+      component: () => import('@/views/ptBprs/PtBprsPnlView.vue'),
     },
     {
       path: '/reports/pt-bprs/gl',
       name: 'pt-bprs-gl',
-      component: PtBprsGlView,
+      component: () => import('@/views/ptBprs/PtBprsGlView.vue'),
     },
     {
       path: '/reports/pt-bprs/trial-balance',
       name: 'pt-bprs-trial-balance',
-      component: PtBprsTrialBalanceView,
+      component: () => import('@/views/ptBprs/PtBprsTrialBalanceView.vue'),
     },
     {
       path: '/reports/pt-uspps-kanjabung/balance-sheet',
       name: 'pt-uspps-kanjabung-balance-sheet',
-      component: PtUspsKanjabungBalanceSheetView,
+      component: () => import('@/views/ptUspsKanjabung/PtUspsKanjabungBalanceSheetView.vue'),
     },
     {
       path: '/reports/pt-uspps-kanjabung/pnl',
       name: 'pt-uspps-kanjabung-pnl',
-      component: PtUspsKanjabungPnlView,
+      component: () => import('@/views/ptUspsKanjabung/PtUspsKanjabungPnlView.vue'),
     },
     {
       path: '/reports/pt-uspps-kanjabung/trial-balance',
       name: 'pt-uspps-kanjabung-trial-balance',
-      component: PtUspsKanjabungTrialBalanceView,
+      component: () => import('@/views/ptUspsKanjabung/PtUspsKanjabungTrialBalanceView.vue'),
     },
     {
       path: '/odoo/login',
       name: 'odoo-login',
-      component: OdooLoginView,
+      component: () => import('@/views/odoo/OdooLoginView.vue'),
       meta: { guestOnly: true },
     },
     {
       path: '/odoo/reports/:companyCode(kan-jabung|pt-jgi)',
       name: 'odoo-reports',
-      component: OdooFinanceReportsView,
+      component: () => import('@/views/odoo/OdooFinanceReportsView.vue'),
       meta: { requiresAuth: true },
     },
     {
       path: '/consolidation/config',
       name: 'consolidation-config',
-      component: ConsolidationConfigView,
+      component: () => import('@/views/consolidation/ConsolidationConfigView.vue'),
       meta: { requiresAuth: true },
     },
     {
       path: '/consolidation/preview',
       name: 'consolidation-preview',
-      component: ConsolidationPreviewView,
+      component: () => import('@/views/consolidation/ConsolidationPreviewView.vue'),
       meta: { requiresAuth: true },
     },
     {
       path: '/consolidation/reports',
       name: 'consolidation-reports',
-      component: ConsolidationReportsView,
+      component: () => import('@/views/consolidation/ConsolidationReportsView.vue'),
       meta: { requiresAuth: true },
     },
     {
       path: '/help/consolidation-config',
       name: 'help-consolidation-config',
-      component: ConsolidationConfigHelpView,
+      component: () => import('@/views/help/ConsolidationConfigHelpView.vue'),
       meta: { requiresAuth: true },
     },
   ],
